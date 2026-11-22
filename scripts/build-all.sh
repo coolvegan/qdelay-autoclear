@@ -13,4 +13,4 @@ echo
 echo "Artifacts:"
 echo "  dist/juce-linux-aarch64/QDelay-vst2-aarch64.so"
 echo "  dist/mpc/Tilr - VST - QDelay/"
-echo "  dist/Tilr - VST - QDelay-1.3.0.zip"
+echo "  dist/Tilr - VST - QDelay-1.3.1.zip"

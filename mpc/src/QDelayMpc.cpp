@@ -55,39 +55,46 @@ public:
         state = State::idle;
         gain = 1.0f;
         fastEnv = slowEnv = 0.0f;
-        sinceTrigger = 0;
-        refractory = std::max (1, (int) (0.09f * srate));
+        refractory = std::max (1, (int) (0.06f * srate));
+        sinceTrigger = refractory;   // the very first note may trigger immediately
+        tailEnv = 0.0f;
+        muteWrites = false;
     }
 
-    void set (bool enabled_, float fadeMs_, float thresholdDb_, float holdMs_, float amount_, int source_)
+    // MPC effects never receive MIDI: Auto Clear is always audio-triggered.
+    void set (bool enabled_, float fadeMs_, float thresholdDb_, float holdMs_, float amount_)
     {
         enabled = enabled_;
         fadeMs = clamp (fadeMs_, 2.0f, 1000.0f);
         holdMs = clamp (holdMs_, 0.0f, 2000.0f);
         amount = clamp (amount_, 0.0f, 1.0f);
         threshold = std::pow (10.0f, clamp (thresholdDb_, -80.0f, 0.0f) / 20.0f);
-        source = clamp (source_, 0, 2);
 
         if (! enabled || amount <= 0.0001f)
         {
             state = State::idle;
             gain = 1.0f;
+            muteWrites = false;
         }
     }
 
-    void beginBlock (bool midiNoteOn)
-    {
-        if (enabled && amount > 0.0001f && midiNoteOn && (source == 1 || source == 2))
-            trigger();
-    }
+    /**
+        Returns the wet gain for this sample.
 
-    float process (float left, float right, bool& clearNow)
+        clearNow  - set once when a 100% clear must wipe the whole delay line.
+        muteWrites- set while the kill is active, so the caller writes zeros
+                    into the delay/feedback loop instead of refilling it.
+    */
+    float process (float left, float right, bool& clearNow, bool& muteWrites_)
     {
         clearNow = false;
+        muteWrites_ = false;
+
         if (! enabled || amount <= 0.0001f)
         {
             state = State::idle;
             gain = 1.0f;
+            muteWrites = false;
             return 1.0f;
         }
 
@@ -95,15 +102,17 @@ public:
         fastEnv += (peak > fastEnv ? fastAttack : fastRelease) * (peak - fastEnv);
         slowEnv += (peak > slowEnv ? slowAttack : slowRelease) * (peak - slowEnv);
 
-        if (source == 0 || source == 2)
-        {
-            const bool above = fastEnv > threshold || peak > threshold;
-            const bool transient = above
-                                && fastEnv > slowEnv * 2.2f
-                                && sinceTrigger > refractory;
-            if (transient && state != State::fadingOut)
-                trigger();
-        }
+        // Adaptive onset detector. The absolute threshold is only a floor;
+        // the real trigger is a rise against the running level. This works
+        // for a new note over a sustained pad or a busy mix, not just for a
+        // clean transient in silence.
+        // Only kill when there is actually a delay tail to kill. This keeps
+        // the first note after loading from erasing its own first repeat.
+        const bool hasTail = tailEnv > 0.0005f;
+        const bool aboveFloor = peak > threshold;
+        const bool rising = (fastEnv > slowEnv * 1.30f) || (peak > slowEnv * 1.45f);
+        if (hasTail && aboveFloor && rising && sinceTrigger > refractory && state != State::fadingOut)
+            trigger();
 
         if (sinceTrigger < 0x3fffffff)
             ++sinceTrigger;
@@ -119,11 +128,20 @@ public:
                 if (gain <= fadeFloor)
                 {
                     gain = fadeFloor;
-                    clearNow = amount > 0.999f;
+                    clearNow = kill;
+                    if (kill)
+                        tailEnv = 0.0f;
                     held = (int) (holdMs * 0.001f * srate);
-                    state = held > 0 ? State::holding : State::fadingIn;
-                    if (state == State::fadingIn)
+                    if (held > 0)
+                    {
+                        state = State::holding;
+                    }
+                    else
+                    {
+                        state = State::fadingIn;
                         prepareFadeIn();
+                        muteWrites = false;
+                    }
                 }
                 break;
 
@@ -132,6 +150,7 @@ public:
                 {
                     state = State::fadingIn;
                     prepareFadeIn();
+                    muteWrites = false;
                 }
                 break;
 
@@ -141,18 +160,14 @@ public:
                 {
                     gain = 1.0f;
                     state = State::idle;
+                    muteWrites = false;
                 }
                 break;
         }
 
+        muteWrites_ = muteWrites;
         return gain;
     }
-
-    bool isEnabled() const { return enabled && amount > 0.0001f; }
-
-    // Samples immediately before the write head that must survive a clear:
-    // this is the new note's attack plus a safety margin.
-    int recentSamples() const { return fadeOutSamples + 64; }
 
 private:
     enum class State { idle, fadingOut, holding, fadingIn };
@@ -160,15 +175,14 @@ private:
     void trigger()
     {
         sinceTrigger = 0;
-        fadeFloor = 1.0f - amount;
-        // Full clears fade out quickly (the new attack is preserved), then
-        // fade back in over the user's fade time. Partial ducks use the full
-        // fade time in both directions.
-        const float outMs = amount > 0.999f ? std::min (fadeMs, 12.0f) : fadeMs;
+        kill = amount > 0.999f;
+        fadeFloor = kill ? 0.0f : 1.0f - amount;
+        const float outMs = kill ? 2.0f : fadeMs;
         fadeOutSamples = std::max (1, (int) (outMs * 0.001f * srate));
         fadeStep = std::max (1.0e-6f, (gain - fadeFloor) / (float) fadeOutSamples);
         if (gain <= fadeFloor)
             gain = fadeFloor;
+        muteWrites = kill;
         state = State::fadingOut;
     }
 
@@ -181,11 +195,10 @@ private:
     State state = State::idle;
     float srate = 44100.0f;
     bool enabled = false;
-    int source = 0;
     float amount = 1.0f;
-    float fadeMs = 30.0f;
-    float holdMs = 0.0f;
-    float threshold = 0.01f;
+    float fadeMs = 20.0f;
+    float holdMs = 1.0f;
+    float threshold = 0.0056f;
     float gain = 1.0f;
     float fadeStep = 0.01f;
     float fadeFloor = 0.0f;
@@ -193,10 +206,20 @@ private:
     int held = 0;
     float fastEnv = 0.0f;
     float slowEnv = 0.0f;
+    float tailEnv = 0.0f;
     float fastAttack = 0.01f, fastRelease = 0.001f;
     float slowAttack = 0.001f, slowRelease = 0.0001f;
     int sinceTrigger = 0;
     int refractory = 4000;
+    bool kill = false;
+    bool muteWrites = false;
+public:
+    // Called by the processor with the delay output so Auto Clear knows
+    // whether there is a tail worth killing.
+    void observeWet (float peak)
+    {
+        tailEnv += (peak > tailEnv ? 0.02f : 0.00015f) * (peak - tailEnv);
+    }
 };
 
 // ---------------------------------------------------------------------------
@@ -437,7 +460,7 @@ public:
         pMode, pWidth, pStereo, pSwing, pFeel, pTape, pOutput,
         pLowCut, pHighCut, pDrive, pTone, pDiffAmt, pDiffSize, pModDepth, pModRate,
         pEqLow, pEqMid, pEqHigh, pDuckAmt, pDuckThres, pDuckAtk, pDuckRel,
-        pAutoClear, pClearFade, pClearThresh, pClearHold, pClearAmt, pClearSrc,
+        pAutoClear, pClearFade, pClearThresh, pClearHold, pClearAmt,
         kNumParams
     };
 
@@ -447,7 +470,7 @@ public:
         i.name = "QDelay";
         i.vendor = "Tilr";
         i.uniqueId = MPC_FOURCC ('q', 'd', 'e', 'l');
-        i.version = 1300;
+        i.version = 1301;
         i.isInstrument = false;
         i.numInputs = 2;
         i.numOutputs = 2;
@@ -492,12 +515,11 @@ public:
         addParam (logParam ("duck_atk", "Duck Atk", 0.1f, 200.0f, 5.0f, "ms", 1));
         addParam (logParam ("duck_rel", "Duck Rel", 10.0f, 5000.0f, 300.0f, "ms", 0));
 
-        addParam (boolParam ("autoclear", "Auto Clear", false));
-        addParam (logParam ("clear_fade", "Clear Fade", 2.0f, 500.0f, 30.0f, "ms", 0));
-        addParam (floatParam ("clear_thr", "Clear Thr", -60.0f, 0.0f, -30.0f, "dB", 1));
+        addParam (boolParam ("autoclear", "Auto Clear", true));
+        addParam (logParam ("clear_fade", "Clear Fade", 2.0f, 500.0f, 20.0f, "ms", 0));
+        addParam (floatParam ("clear_thr", "Clear Thr", -60.0f, 0.0f, -45.0f, "dB", 1));
         addParam (logParam ("clear_hold", "Clear Hold", 1.0f, 1000.0f, 1.0f, "ms", 0));
         addParam (floatParam ("clear_amt", "Clear Amt", 0.0f, 100.0f, 100.0f, "%", 0));
-        addParam (choiceParam ("clear_src", "Clear Src", { "Audio", "MIDI", "Both" }, 0));
 
         addPrograms();
     }
@@ -550,7 +572,6 @@ public:
 
         const float sr = (float) sampleRate;
         maxDelaySamples = (float) (maxDelay - 4);
-        srate = sr;
         modPhase = wowPhase = flutterPhase = 0.0f;
         reset();
     }
@@ -627,8 +648,6 @@ public:
 
         const float swing = get (pSwing) * 0.01f;
         float feel = get (pFeel) * 0.01f;
-        if (mode == 2) // classic ping-pong: the right tap is the return tap
-            targetR *= 1.0f;
         targetR *= 1.0f + 0.5f * swing;
         targetL += feel * 0.06f * sr;
         targetR += feel * 0.06f * sr;
@@ -691,23 +710,37 @@ public:
                        get (pClearFade),
                        get (pClearThresh),
                        get (pClearHold),
-                       clamp (get (pClearAmt) * 0.01f, 0.0f, 1.0f),
-                       getInt (pClearSrc));
-
-        bool midiNoteOn = false;
-        for (int e = 0; e < ctx.numMidiEvents; ++e)
-            if (ctx.midi[e].isNoteOn())
-            {
-                midiNoteOn = true;
-                break;
-            }
-        autoClear.beginBlock (midiNoteOn);
+                       clamp (get (pClearAmt) * 0.01f, 0.0f, 1.0f));
 
         // ---- per-sample loop --------------------------------------------
         for (int i = 0; i < n; ++i)
         {
             const float dryL = inL ? inL[i] : 0.0f;
             const float dryR = inR ? inR[i] : 0.0f;
+
+            // Auto Clear must be evaluated before the delay write so a full
+            // kill can mute the loop and wipe the line at zero gain.
+            bool clearNow = false, muteWrites = false;
+            const float autoClearGain = autoClear.process (dryL, dryR, clearNow, muteWrites);
+            if (clearNow)
+            {
+                // Full kill: wipe the line and every stateful block around it,
+                // otherwise a long IIR tail could refill the loop at max feedback.
+                delayL.reset();
+                delayR.reset();
+                diffL.reset();
+                diffR.reset();
+                lowCutL.reset(); lowCutR.reset();
+                highCutL.reset(); highCutR.reset();
+                sendLowL.reset(); sendLowR.reset();
+                sendHighL.reset(); sendHighR.reset();
+                eqLowL.reset(); eqLowR.reset();
+                eqMidL.reset(); eqMidR.reset();
+                eqHighL.reset(); eqHighR.reset();
+                satToneL.reset(); satToneR.reset();
+                satL.reset(); satR.reset();
+                dcL.reset(); dcR.reset();
+            }
 
             const float lfo = fastSin01 (modPhase);
             modPhase = wrapPhase (modPhase + modInc);
@@ -727,6 +760,7 @@ public:
 
             float wetL = delayL.readLinear (dL);
             float wetR = delayR.readLinear (dR);
+            autoClear.observeWet (std::max (std::abs (wetL), std::abs (wetR)));
 
             // feedback shaping: 12 dB filters, EQ, then gentle saturation.
             float fbL = lowCutL.process (wetL);
@@ -786,28 +820,22 @@ public:
                 writeR = fbL * fb;
             }
 
+            if (muteWrites)
+            {
+                writeL = 0.0f;
+                writeR = 0.0f;
+            }
+
             if (std::fabs (writeL) > 1.0f) writeL = softClip (writeL);
             if (std::fabs (writeR) > 1.0f) writeR = softClip (writeR);
 
             delayL.write (writeL);
             delayR.write (writeR);
 
-            // ducking (input-triggered) and Auto Clear (new-note triggered)
-            float gain = 1.0f;
+            float gain = autoClearGain;
             const float duckAmt = duckAmtSmooth.process();
             if (duckAmt > 0.0001f)
                 gain *= 1.0f - clamp (duck.process (dryL, dryR) * duckAmt, 0.0f, 1.0f);
-
-            bool clearNow = false;
-            gain *= autoClear.process (dryL, dryR, clearNow);
-            if (clearNow)
-            {
-                const int keep = autoClear.recentSamples();
-                delayL.clearExceptRecent (keep);
-                delayR.clearExceptRecent (keep);
-                diffL.reset();
-                diffR.reset();
-            }
 
             wetL *= gain;
             wetR *= gain;
@@ -872,7 +900,7 @@ private:
             { pDiffAmt, 22.0f }, { pDiffSize, 40.0f },
             { pModDepth, 6.0f }, { pModRate, 0.5f },
             { pTape, 10.0f }, { pEqMid, -1.5f },
-            { pAutoClear, 1.0f }, { pClearFade, 40.0f }, { pClearThresh, -34.0f },
+            { pAutoClear, 1.0f }, { pClearFade, 40.0f }, { pClearThresh, -42.0f },
         });
 
         program ("Tubby's Tape", {
@@ -884,7 +912,7 @@ private:
             { pDiffAmt, 12.0f }, { pDiffSize, 30.0f },
             { pModDepth, 5.0f }, { pModRate, 0.35f },
             { pEqMid, -2.5f }, { pEqLow, 1.0f },
-            { pAutoClear, 1.0f }, { pClearFade, 50.0f }, { pClearThresh, -34.0f },
+            { pAutoClear, 1.0f }, { pClearFade, 50.0f }, { pClearThresh, -42.0f },
         });
 
         program ("Thunder Dub", {
@@ -896,7 +924,7 @@ private:
             { pDiffAmt, 30.0f }, { pDiffSize, 55.0f },
             { pModDepth, 10.0f }, { pModRate, 0.3f }, { pTape, 8.0f },
             { pEqMid, -2.0f },
-            { pAutoClear, 1.0f }, { pClearFade, 70.0f }, { pClearThresh, -36.0f },
+            { pAutoClear, 1.0f }, { pClearFade, 70.0f }, { pClearThresh, -45.0f },
             { pClearHold, 20.0f },
         });
 
@@ -909,7 +937,7 @@ private:
             { pDiffAmt, 8.0f }, { pDiffSize, 20.0f },
             { pModDepth, 18.0f }, { pModRate, 2.0f }, { pTape, 6.0f },
             { pEqMid, 1.0f },
-            { pAutoClear, 1.0f }, { pClearFade, 20.0f }, { pClearThresh, -30.0f },
+            { pAutoClear, 1.0f }, { pClearFade, 20.0f }, { pClearThresh, -42.0f },
         });
 
         program ("Melodica Echo", {
@@ -920,7 +948,7 @@ private:
             { pDiffAmt, 12.0f }, { pDiffSize, 25.0f },
             { pModDepth, 3.0f }, { pModRate, 0.8f },
             { pEqMid, -1.0f },
-            { pAutoClear, 1.0f }, { pClearFade, 30.0f }, { pClearThresh, -31.0f },
+            { pAutoClear, 1.0f }, { pClearFade, 30.0f }, { pClearThresh, -42.0f },
         });
 
         program ("Spring Dub", {
@@ -931,7 +959,7 @@ private:
             { pDiffAmt, 42.0f }, { pDiffSize, 50.0f },
             { pModDepth, 4.0f }, { pModRate, 0.5f },
             { pEqMid, -1.5f },
-            { pAutoClear, 1.0f }, { pClearFade, 45.0f }, { pClearThresh, -33.0f },
+            { pAutoClear, 1.0f }, { pClearFade, 45.0f }, { pClearThresh, -42.0f },
         });
 
         program ("Dub Plate", {
@@ -942,7 +970,7 @@ private:
             { pDiffAmt, 8.0f }, { pDiffSize, 15.0f },
             { pModDepth, 8.0f }, { pModRate, 0.4f },
             { pEqLow, -1.0f }, { pEqMid, -3.0f },
-            { pAutoClear, 1.0f }, { pClearFade, 50.0f }, { pClearThresh, -35.0f },
+            { pAutoClear, 1.0f }, { pClearFade, 50.0f }, { pClearThresh, -42.0f },
         });
 
         program ("Auto Clear Throw", {
@@ -952,7 +980,7 @@ private:
             { pDrive, 6.0f }, { pTone, 55.0f }, { pTape, 6.0f },
             { pDiffAmt, 12.0f }, { pDiffSize, 25.0f },
             { pModDepth, 4.0f }, { pModRate, 0.8f },
-            { pAutoClear, 1.0f }, { pClearFade, 12.0f }, { pClearThresh, -28.0f },
+            { pAutoClear, 1.0f }, { pClearFade, 12.0f }, { pClearThresh, -40.0f },
             { pClearHold, 40.0f },
         });
 
@@ -972,6 +1000,7 @@ private:
             { pDrive, 0.0f }, { pTone, 50.0f },
             { pDiffAmt, 8.0f }, { pDiffSize, 20.0f },
             { pModDepth, 3.0f }, { pModRate, 0.4f }, { pTape, 2.0f },
+            { pAutoClear, 0.0f },
         });
     }
 
@@ -991,7 +1020,6 @@ private:
     AutoClear autoClear;
     DuckFollower duck;
 
-    float srate = 44100.0f;
     float maxDelaySamples = 176400.0f;
     float modPhase = 0.0f;
     float wowPhase = 0.0f;

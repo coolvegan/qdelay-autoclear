@@ -20,18 +20,26 @@ Tilr, extended with:
 
 ## Auto Clear
 
-Auto Clear is inspired by the AIR Delay Pro "Auto Clear" idea, but it does not
-hard-cut the tail:
+Auto Clear is inspired by the AIR Delay Pro "Auto Clear" idea. On the MPC the
+effect is triggered by the audio of the new note; MPC effect plugins never
+receive MIDI. The desktop build can additionally use MIDI note-ons.
 
-1. a new note is detected from the audio input (or MIDI, when available)
-2. the wet path fades out quickly
-3. the delay line is cleared at minimum gain, keeping the last few milliseconds
-   so the new note's attack remains
-4. after the hold time the wet path fades back in over the Clear Fade time
+At **Clear Amt = 100%** the function is a true kill:
 
-The old repeats disappear, the new note keeps its first repeat, and the reset
-cannot click. Controls: **Auto Clear**, **Fade**, **Threshold**, **Hold**,
-**Amount** and **Source** (Audio / MIDI / both).
+1. a new note is detected from the audio input
+2. the wet path fades to zero in about 2 ms
+3. the send and feedback writes are muted so the old loop cannot refill
+4. the complete delay line is cleared
+5. after the hold time the wet path fades back in over the Clear Fade time
+
+Nothing of the old tail survives, even at maximum feedback. At lower Clear Amt
+values the function behaves as a smooth duck instead of a full kill. Controls:
+**Auto Clear**, **Fade**, **Threshold**, **Hold**, **Amount**. The desktop build
+also has a **Source** selector (Audio / MIDI / both); the MPC skin is audio-only.
+
+The MPC skin shows **100% = kill** on the CLEAR page. Auto Clear is enabled by
+default in the MPC build; **Dub Clean** is the preset that intentionally turns
+it off.
 
 ## Features
 
@@ -47,7 +55,7 @@ cannot click. Controls: **Auto Clear**, **Fade**, **Threshold**, **Hold**,
 - Freeze with a click-free crossfade
 - Smooth, click-free parameter changes
 - Output limiter and feedback clamp
-- Auto Clear with audio or MIDI triggering
+- Auto Clear with audio triggering on MPC and optional MIDI on desktop
 
 ## Presets
 

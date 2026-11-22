@@ -99,7 +99,7 @@ QDelay is an insert effect. Its UI is the MPC touchscreen skin in
 EOF
 
 cat > "$PKG/README.txt" <<'EOF'
-QDelay 1.3.0 - dual dub delay for Akai MPC
+QDelay 1.3.1 - dual dub delay for Akai MPC
 ==========================================
 
 A stereo dual delay built for dub: independent tempo-synced taps, normal /
@@ -109,12 +109,17 @@ note-triggered Auto Clear.
 
 Auto Clear (the AIR Delay Pro-style feature)
 --------------------------------------------
-When a new note arrives, QDelay fades the old tail out over the Clear Fade
-time, clears the delay line at zero gain (so it cannot click), waits for
-Clear Hold and fades the wet path back in. The new note's own repeats are
-unaffected. Trigger source is Audio (default), MIDI or both; the threshold
-sets how loud a new note must be. Set Clear Amt below 100% to duck the tail
-instead of removing it completely.
+At Clear Amt = 100% this is a true kill: a new note fades the wet path out in
+about 2 ms, mutes the send and feedback writes, clears the complete delay line,
+waits for Clear Hold and fades back in over the Clear Fade time. Nothing of the
+old tail survives, even at maximum feedback. At lower Clear Amt values the
+function is a smooth duck instead.
+
+MPC effects receive no MIDI, so the MPC build always triggers from the audio
+of the new note. Auto Clear is on by default; Dub Clean is the preset that
+intentionally turns it off. Clear Thr is an absolute floor (-45 dB by default)
+and the detector also reacts to a rise above the running level, so it works
+over a pad or a busy mix, not only in silence.
 
 Factory programs
 ----------------
@@ -139,7 +144,7 @@ python3 - "$PKG" <<'PY'
 import os, shutil, sys
 pkg = sys.argv[1]
 root = os.path.dirname(os.path.dirname(pkg))
-archive = os.path.join(root, "Tilr - VST - QDelay-1.3.0")
+archive = os.path.join(root, "Tilr - VST - QDelay-1.3.1")
 shutil.make_archive(archive, "zip", os.path.dirname(pkg), os.path.basename(pkg))
 print("wrote " + archive + ".zip")
 PY

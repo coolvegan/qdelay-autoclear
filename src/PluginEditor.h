@@ -23,6 +23,7 @@
 #include "ui/LofiWidget.h"
 #include "ui/TapeWidget.h"
 #include "ui/PhaserWidget.h"
+#include "ui/AutoClearWidget.h"
 #include "ui/DuckMeter.h"
 #include "dsp/Delay.h"
 #include "PresetMgr.h"
@@ -98,6 +99,7 @@ private:
     std::unique_ptr<Rotary> duckAmt;
     std::unique_ptr<Rotary> duckAtk;
     std::unique_ptr<Rotary> duckRel;
+    TextButton autoClearBtn;
     std::unique_ptr<DuckMeter> duckMeter;
     Slider pitchMix;
     Slider freqMix;
@@ -111,6 +113,7 @@ private:
     std::unique_ptr<TapeWidget> tapeWidget;
     std::unique_ptr<LofiWidget> lofiWidget;
     std::unique_ptr<PhaserWidget> phaserWidget;
+    std::unique_ptr<AutoClearWidget> autoClearWidget;
     std::unique_ptr<Meter> meter;
 
     CustomLookAndFeel* customLookAndFeel = nullptr;

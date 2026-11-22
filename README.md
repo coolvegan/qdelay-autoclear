@@ -1,116 +1,196 @@
-<h1 align="center">
-  <!-- <img src="doc/logo.png" width="200" style="padding: 5px;" /> -->
-  QDelay
-  <br>
-</h1>
-<div align="center">
+# QDelay Auto Clear
 
-[![Windows Support](https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/tiagolr/qdelay/releases)
-[![Ubuntu Support](https://img.shields.io/badge/Linux-E95420?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/tiagolr/qdelay/releases)
-[![Mac Support](https://img.shields.io/badge/MACOS-adb8c5?style=for-the-badge&logo=macos&logoColor=white)](https://github.com/tiagolr/qdelay/releases)
+A dual stereo delay with a musical **Auto Clear** function: when a new note
+arrives, the old delay tail fades out smoothly, the delay line is cleared, and
+the wet signal fades back in. The new note's own first repeat survives.
 
-</div>
-<div align="center">
+This repository is a fork of [QDelay](https://github.com/tiagolr/qdelay) by
+Tilr, extended with:
 
-[![GitHub package.json version](https://img.shields.io/github/v/release/tiagolr/qdelay?color=%40&label=latest)](https://github.com/tiagolr/qdelay/releases/latest)
-![GitHub issues](https://img.shields.io/github/issues-raw/tiagolr/qdelay)
-![GitHub all releases](https://img.shields.io/github/downloads/tiagolr/qdelay/total)
-![Github license](https://img.shields.io/github/license/tiagolr/qdelay)
+- the Auto Clear note-fade behaviour
+- a reworked, MPC-ready DSP path
+- nine Dub presets
+- a native **Akai MPC standalone** VST2 build (ARM64 and ARM32)
+- an ARM64 Linux desktop build with the full JUCE editor
 
-</div>
+![QDelay editor](sketch.png)
 
-**QDelay** (short for quick-delay) is a dual-delay with more features than it should for a free plugin that's supposed to be quick. While it offers nothing groundbreaking it is based on popular units like *ReplikaXT* and *EchoBoy*. The main goal is to create a free and open plug-in for my own productions, an alternative to the popular [Deelay](https://sixthsample.com/deelay/) by *SixthSample* without premium versions or trimmed features or on-line activation.
+## Auto Clear
 
-<div align="center">
+Auto Clear is inspired by the AIR Delay Pro "Auto Clear" idea, but it does not
+hard-cut the tail:
 
-![Screenshot](./doc/qdelay.png)
+1. a new note is detected from the audio input (or MIDI, when available)
+2. the wet path fades out quickly
+3. the delay line is cleared at minimum gain, keeping the last few milliseconds
+   so the new note's attack remains
+4. after the hold time the wet path fades back in over the Clear Fade time
 
-</div>
+The old repeats disappear, the new note keeps its first repeat, and the reset
+cannot click. Controls: **Auto Clear**, **Fade**, **Threshold**, **Hold**,
+**Amount** and **Source** (Audio / MIDI / both).
 
 ## Features
 
-  * **Stereo Dual Delay** with independent delay times and multiple modes.
-  * **Ping-Pong mode** with feedback width control.
-  * **Tap mode** with offset time (tap) and delay time.
-  * **Swing and Feel** offset.
-  * **Accent** odd or even taps.
-  * **Reverse** delay.
-  * **Parametric EQ** on feedback and input signal.
-  * **Diffusion** on pre or post delay signal.
-  * **Modulation** of delay line time.
-  * **Pitch Shifter** on the feedback or post delay signal.
-  * **Saturation** on pre and post delay signal (optionally on Feedback path).
-  * **Color, Bias and Dynamics** controls for saturation.
-  * **Ducking** to muffle the delayed signal on input.
-  * **Tape wow and flutter** to add tone variation.
-  * **Taps preview** display.
+- Stereo dual delay with independent left/right times
+- Tempo sync with straight, triplet and dotted divisions
+- Normal, Ping-Pong and Classic Ping-Pong routing
+- Feedback width, stereo width, swing and feel
+- 12 dB/oct low/high cut, parametric feedback EQ and a DC blocker
+- Diffusion with a true allpass chain
+- Modulation and tape wow/flutter
+- 2x oversampled feedback saturation
+- Input ducking
+- Freeze with a click-free crossfade
+- Smooth, click-free parameter changes
+- Output limiter and feedback clamp
+- Auto Clear with audio or MIDI triggering
 
-## Download
+## Presets
 
-* [Download latest release](https://github.com/tiagolr/qdelay/releases)
-* Current builds include VST3 for Windows, VST3 and LV2 for Linux and AU and VST3 for macOS.
+The factory bank contains **Init**, **Classic Pong** and nine Dub presets:
 
-## About
+| Preset | Character |
+|---|---|
+| Dub Chamber | long ping-pong, filtered repeats, diffusion and tape |
+| Tubby's Tape | 1/4-note tape echo, wow and flutter |
+| Thunder Dub | 1/2-dotted twin taps, dark tail, Auto Clear 70 ms |
+| Dub Siren | fast modulation and saturation for siren throws |
+| Melodica Echo | triplet 1/8, bright and short |
+| Spring Dub | high diffusion, spring-like smeared repeats |
+| Dub Plate | saturated, band-limited, tape-worn dub plate |
+| Auto Clear Throw | 1/4 send with a 12 ms Auto Clear and 40 ms hold |
+| Dub Clean | open, clean 1/4 dub echo without drive |
 
-**QDelay** [started as a JSFX](https://github.com/tiagolr/tilr_jsfx?tab=readme-ov-file#qdelay) a few years ago to have a quick delay with basic features like Ping-Pong, cutoff and pitch shift. Like other plug-ins I've rebuilt, the goal is to make an improved version using better tools with better visuals, performance etc.
+## Akai MPC
 
-I decided to build a plug-in that could come somewhat close to EchoBoy in terms of capabilities, the result is good enough but probably nowhere near the quality of Saturations or Tape emulations that SoundToys and Native Instruments engineers can achieve. The distortion unit is based of [JClones TapeHead](https://github.com/JClones/JSFXClones/blob/master/JClones_TapeHead.md) - an open JSFX tape like distortion.
+MPC OS 3.10.1+ loads third-party VST2 plugins from a `VST2 Plugins` folder at
+the root of a drive. MPC has no plugin windows and no X11/font stack, so the MPC
+build is a separate headless VST2 using Akai's MIT-licensed MPC Plugin SDK. Its
+touch UI and 16 Q-Link mappings are generated from `mpc/ui.json`.
 
-For the pitch shift, I couldn't find many solutions for a zero latency pitch shift that I could adapt to this project, so I went with what I know and ported Saike's [Pitch_Shift](https://github.com/JoepVanlier/JSFX/blob/master/Basics/Saike_Pitch_Shift.jsfx) library from JSFX to c++ and JUCE. The result is surprisingly good and it's impressive the number of people looking for a solution like this in JUCE forums and other places.
-
-Delay swing is implemented using serial delay lines with different times and Feel/Offset is implemented in a hacky way by shifting the write position of the input in relation to the feedback with some extra care to pick the leading write to override the circular buffer while the trailing write overdubs the existing contents.
-
-Tape Flutter and Wow, is taken from ChowDSP [AnalogTapeModel](https://github.com/jatinchowdhury18/AnalogTapeModel).
-
-For future work things can be added like multiple taps per delay like EchoBoy or Valhalla delay, better saturations and more delay modes.
-
-Feel free to explore the repository for snippets on parametric EQs, envelope followers, pitch shifting etc.. or most likely just download the plug-in and have fun with it.
-
-## Tips
-
-Current signal routing:
-
-```
-Input > EQ Input > LoFi pre > Saturation Pre > Diffusion Pre >
-[Delay <-> Modulation <-> EQ Feedback <-> Pitch Feedback <-> Saturation Feedback] >
-Pitch Post > Tape Wow/Flutter > Lofi Post > Saturation Post > Diffusion Post > EQ Output > Output
-```
-
-* Diffusion and Pitch shift can be configured to be Pre|Post or Feedback|Post in the settings menu.
-* Saturation can run on the feedback loop for analog tape distortion, with caution, it adds energy each feedback pass.
-* In **Tap** mode the first time controls the offset (tap), the second is the delay time.
-* In **Ping-Pong classic** mode the decay is only applied in one channel (left or right).
-* **Feel** control offsets the whole delay line by max 1/16 note.
-* **Bias** control in Saturation tab shifts the saturation curve creating even harmonics.
-* **Dynamics** control in Saturation tab makes louder hits harder and quieter softer.
-
-## MacOS
-
-Because the builds are unsigned you may have to run the following commands:
+Build and package:
 
 ```bash
-sudo xattr -dr com.apple.quarantine /path/to/your/plugins/QDelay.component
-sudo xattr -dr com.apple.quarantine /path/to/your/plugins/Qdelay.vst3
-sudo xattr -dr com.apple.quarantine /path/to/your/plugins/Qdelay.lv2
+./scripts/build-mpc.sh
 ```
 
-The commands above will recursively remove the quarantine flag from the plug-ins.
+Output:
 
-## Build
+```
+dist/mpc/Tilr - VST - QDelay/
+├── plugin.json
+├── version.xml
+├── VST/qdelay-arm64.so     # MPC Live III / XL and 64-bit MPC OS
+├── VST/qdelay-arm32.so     # Live / Live II / One / One+ / X / Key / Force
+└── Plugin Skins/           # TUI.json, Q-Links.json, artwork
+```
+
+Install:
+
+1. Copy the whole `Tilr - VST - QDelay` folder to
+   `<drive>/VST2 Plugins/`.
+2. On the MPC open **Preferences → Enhancements (Beta)** and enable
+   **Enable Enhancements** and **External Plugin Support**.
+3. Restart or rescan. QDelay appears under **External Plugins** as an insert
+   effect.
+
+If the MPC is connected as a USB drive, `./scripts/install-mpc.sh` mounts the
+drive, replaces the installed copy, syncs and unmounts it again.
+
+The MPC build is a VST2 shared library with only `libc` and `libm` as
+dependencies. It exports `VSTPluginMain` and uses the clean-room VST2 ABI from
+the MPC SDK.
+
+## ARM64 Linux desktop
+
+The JUCE editor build (the one shown in `sketch.png`) can be cross-compiled for
+64-bit ARM Linux:
 
 ```bash
-git clone --recurse-submodules https://github.com/tiagolr/qdelay.git
-
-# windows
-cmake -G "Visual Studio 18 2026" -DCMAKE_BUILD_TYPE=Release -S . -B ./build
-
-# linux
-sudo apt update
-sudo apt-get install libx11-dev libfreetype-dev libfontconfig1-dev libasound2-dev libxrandr-dev libxinerama-dev libxcursor-dev
-cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -S . -B ./build
-cmake --build ./build --config Release
-
-# macOS
-cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -S . -B ./build
-cmake --build ./build --config Release
+./scripts/build-juce-aarch64.sh
+# dist/juce-linux-aarch64/QDelay-vst2-aarch64.so
 ```
+
+Copy the resulting `.so` to `~/.vst/` on the ARM64 machine. This build is for a
+desktop DAW; it is not the MPC build.
+
+## Build from source
+
+Prerequisites: CMake 3.22+, a C++20 compiler, JUCE 8.0.12 as the `libs/JUCE`
+submodule, and a local VST 2.4 SDK for the VST2 wrapper.
+
+```bash
+git clone --recurse-submodules git@github.com:coolvegan/qdelay-autoclear.git
+cd qdelay-autoclear
+
+# VST2 headers are not redistributable; fetch them locally
+./scripts/fetch-vst2-sdk.sh
+
+# Native Linux VST2 + Standalone
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_VST2=ON -DBUILD_VST3=OFF -DBUILD_LV2=OFF
+cmake --build build -j"$(nproc)"
+```
+
+Build everything that this fork adds:
+
+```bash
+./scripts/build-all.sh
+```
+
+This builds the JUCE ARM64 VST2, the MPC ARM64/ARM32 package, runs the MPC host
+simulator and validates the package.
+
+The VST2 SDK is intentionally not committed. The MPC build does not need it; it
+uses the MIT-licensed clean-room ABI in `mpc/framework/mpc_vst2_abi.h`.
+
+## Verification
+
+The MPC build is tested with the SDK's MPC-compatible host simulator before it
+is packaged:
+
+- ARM64 and ARM32: 20/20 host checks pass
+- Auto Clear: old tail suppressed to about -90 dB, new first repeat preserved
+- maximum feedback/drive/diffusion: no NaN, no clipping, no denormals
+- output limiter holds peaks at or below 0 dBFS
+- MPC validator: 0 errors, 0 warnings
+- ARM64 and ARM32 binaries also execute and pass under QEMU with an ARM sysroot
+
+## Signal path
+
+```
+input -> low/high cut -> diffusion -> dual delay
+      -> feedback EQ -> saturation -> tone -> feedback gain
+      -> Auto Clear / ducking -> stereo width -> dry/wet -> limiter -> output
+```
+
+## Project layout
+
+| Path | Contents |
+|---|---|
+| `src/` | JUCE plugin, editor and DSP |
+| `resources/presets/` | factory preset XML |
+| `mpc/src/QDelayMpc.cpp` | MPC / VST2 DSP and entry point |
+| `mpc/ui.json` | MPC touch UI layout |
+| `mpc/framework/` | vendored MIT MPC Plugin SDK framework |
+| `mpc/tools/` | MPC host simulator, skin generator, validator |
+| `scripts/` | build, VST2 SDK fetch and MPC install scripts |
+| `docker/` | cross-compilation images |
+| `cmake/toolchains/` | ARM64 Linux toolchain |
+
+## Credits
+
+QDelay was created by **Tilr** and is based on ideas from EchoBoy, ReplikaXT,
+Deelay, Saike's pitch shifter, JClones TapeHead and ChowDSP's AnalogTapeModel.
+See the upstream project for the original DSP history and implementation
+notes: <https://github.com/tiagolr/qdelay>.
+
+The MPC build uses the MIT-licensed MPC Plugin SDK framework by inMusic.
+
+## License
+
+QDelay is distributed under the **GNU General Public License v3.0**; see
+[`LICENSE`](LICENSE). JUCE is used under the AGPLv3 or a commercial JUCE
+license. The MPC Plugin SDK framework is MIT licensed; its license is included
+in `mpc/vendor/MPC-PLUGIN-SDK-LICENSE`.

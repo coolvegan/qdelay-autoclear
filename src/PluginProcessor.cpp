@@ -139,6 +139,15 @@ AudioProcessorValueTreeState::ParameterLayout QDelayAudioProcessor::createParame
         layout.add(std::make_unique<AudioParameterBool>(paramPrefix + "_bypass", namePrefix + " Bypass", false));
     }
 
+    // Auto Clear (Air Delay Pro style): terminate the old tail smoothly when a new note arrives.
+    // Appended last so existing VST2 automation indices stay stable.
+    layout.add(std::make_unique<AudioParameterBool>("autoclear", "Auto Clear", false));
+    layout.add(std::make_unique<AudioParameterFloat>("clear_fade", "Auto Clear Fade", NormalisableRange<float>(2.f, 500.f, 0.1f, 0.5f), 40.f));
+    layout.add(std::make_unique<AudioParameterFloat>("clear_thresh", "Auto Clear Threshold", NormalisableRange<float>(-60.f, 0.f, 0.1f), -30.f));
+    layout.add(std::make_unique<AudioParameterFloat>("clear_hold", "Auto Clear Hold", NormalisableRange<float>(0.f, 1000.f, 1.f, 0.5f), 0.f));
+    layout.add(std::make_unique<AudioParameterFloat>("clear_amt", "Auto Clear Amount", 0.f, 1.f, 1.0f));
+    layout.add(std::make_unique<AudioParameterChoice>("clear_source", "Auto Clear Source", StringArray{ "Audio", "MIDI", "Audio + MIDI" }, 2));
+
     return layout;
 }
 
@@ -402,6 +411,7 @@ void QDelayAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock
     wowflut_l->clear();
     wowflut_r->clear();
     phaser->prepare((float)srate);
+    autoClear.prepare(sampleRate);
     onSlider();
     sendChangeMessage();
 }
@@ -443,6 +453,14 @@ void QDelayAudioProcessor::onSlider()
     float hold = params.getRawParameterValue("duck_hld")->load();
     float release = params.getRawParameterValue("duck_rel")->load();
     follower.prepare((float)srate, thresh, false, attack, hold, release, true);
+
+    autoClear.setParameters(
+        (bool) params.getRawParameterValue("autoclear")->load(),
+        params.getRawParameterValue("clear_fade")->load(),
+        params.getRawParameterValue("clear_thresh")->load(),
+        params.getRawParameterValue("clear_hold")->load(),
+        params.getRawParameterValue("clear_amt")->load(),
+        (int) params.getRawParameterValue("clear_source")->load());
 
     // prepare input EQ
     eqPath = (int)params.getRawParameterValue("eq_path")->load();
@@ -559,6 +577,7 @@ void QDelayAudioProcessor::clearAll()
     distPostOversampler->reset();
     distPreOversampler->reset();
     phaser->clear();
+    autoClear.reset();
 }
 
 bool QDelayAudioProcessor::supportsDoublePrecisionProcessing() const
@@ -568,8 +587,18 @@ bool QDelayAudioProcessor::supportsDoublePrecisionProcessing() const
 
 void QDelayAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
-    (void)midiMessages;
     juce::ScopedNoDenormals disableDenormals;
+
+    bool midiNoteOn = false;
+    for (const auto metadata : midiMessages)
+    {
+        auto message = metadata.getMessage();
+        if (message.isNoteOn())
+        {
+            midiNoteOn = true;
+            break;
+        }
+    }
 
     if (diffusorChanged) {
         diffusorChanged = false;
@@ -850,20 +879,43 @@ void QDelayAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::
         }
     }
 
-    // apply ducking
+    // apply ducking and auto clear
     float duck = params.getRawParameterValue("duck_amt")->load();
-    if (duck > 0.f)
+    bool autoClearOn = (bool) params.getRawParameterValue("autoclear")->load()
+                    && params.getRawParameterValue("clear_amt")->load() > 0.0001f;
+    autoClear.beginBlock(midiNoteOn);
+
+    if (duck > 0.f || autoClearOn)
     {
         for (int i = 0; i < numSamples; ++i)
         {
-            float env = follower.process(
-                buffer.getSample(0, i),
-                buffer.getSample(numChannels > 1 ? 1 : 0, i)
-            );
+            float gain = 1.f;
 
-            float gain = 1.f - env * duck;
+            if (duck > 0.f)
+            {
+                float env = follower.process(
+                    buffer.getSample(0, i),
+                    buffer.getSample(numChannels > 1 ? 1 : 0, i)
+                );
+                gain *= 1.f - env * duck;
+            }
+
+            bool clearNow = false;
+            gain *= autoClear.process(
+                buffer.getSample(0, i),
+                buffer.getSample(numChannels > 1 ? 1 : 0, i),
+                clearNow);
+
             wetBuffer.setSample(0, i, wetBuffer.getSample(0, i) * gain);
             wetBuffer.setSample(1, i, wetBuffer.getSample(1, i) * gain);
+
+            if (clearNow)
+            {
+                // The wet path is near zero; keep the new note's attack so its
+                // own first repeat survives, and remove the old tail.
+                delay->clearExceptRecent(autoClear.recentSamples());
+                diffusor->clear();
+            }
         }
     }
     else

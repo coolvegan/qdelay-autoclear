@@ -55,3 +55,11 @@ products/
 .DS_Store
 build*/
 .cache/
+build-aarch64/
+mpc/build/
+dist/
+third_party/vst2sdk/
+
+# Python
+__pycache__/
+*.pyc

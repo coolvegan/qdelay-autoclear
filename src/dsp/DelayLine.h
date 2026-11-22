@@ -26,6 +26,22 @@ public:
 		}
 	}
 
+	// Clears the line but keeps the most recent `keep` samples before the
+	// write head (Auto Clear uses this to preserve the new note's attack).
+	void clearExceptRecent(int keep)
+	{
+		if (size <= 0) return;
+		if (keep < 0) keep = 0;
+		if (keep > size) keep = size;
+		for (int i = 0; i < size - keep; ++i)
+		{
+			int idx = pos - keep - 1 - i;
+			idx %= size;
+			if (idx < 0) idx += size;
+			buf[idx] = 0.f;
+		}
+	}
+
 	// writes to buffer with an offset without advancing the read position
 	// used to transpose the whole delay for Feel offset
 	void writeOffset(float s, int offset, bool overdub)

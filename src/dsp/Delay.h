@@ -50,6 +50,7 @@ public:
 	void processReverse(float& left, float& right, int revsizeL, int revsizeR,
 		int midL, int midR, int fadetotalL, int fadetotalR);
 	void clear();
+	void clearExceptRecent(int keepSamples);
 	void setEqualizer(std::vector<SVF::EQBand> bands);
 	void onSlider();
 

@@ -1,0 +1,86 @@
+{
+  "kit": { "theme": "mpc-red", "accent": "ffff7070" },
+  "qlinkGroups": "rows",
+  "style": {
+    "background": "ff181818",
+    "accent": "ffff7070",
+    "text": "ffffffff",
+    "muted": "ff8a8a8a"
+  },
+  "pages": [
+    {
+      "name": "DELAY",
+      "background": "qdelay-bg.png",
+      "controls": [
+        { "param": "Sync", "widget": "switch" },
+        { "param": "Div L", "widget": "knob", "overlay": "menu", "visibleWhen": { "param": "Sync", "choice": "On" } },
+        { "param": "Div R", "widget": "knob", "overlay": "menu", "visibleWhen": { "param": "Sync", "choice": "On" } },
+        { "param": "Mix", "widget": "fader" },
+        { "param": "Time L", "widget": "knob", "visibleWhen": { "param": "Sync", "choice": "Off" } },
+        { "param": "Time R", "widget": "knob", "visibleWhen": { "param": "Sync", "choice": "Off" } },
+        { "param": "Feedback", "widget": "knob" },
+        { "param": "Freeze", "widget": "switch" }
+      ]
+    },
+    {
+      "name": "TONE",
+      "background": "qdelay-bg.png",
+      "controls": [
+        { "param": "Low Cut", "widget": "knob" },
+        { "param": "High Cut", "widget": "knob" },
+        { "param": "Drive", "widget": "knob" },
+        { "param": "Tone", "widget": "knob" },
+        { "param": "Diff Amt", "widget": "knob" },
+        { "param": "Diff Size", "widget": "knob" },
+        { "param": "Mod Depth", "widget": "knob" },
+        { "param": "Mod Rate", "widget": "knob" }
+      ]
+    },
+    {
+      "name": "SPACE",
+      "background": "qdelay-bg.png",
+      "controls": [
+        { "param": "Mode", "widget": "switch" },
+        { "param": "Width", "widget": "knob", "polarity": "bipolar" },
+        { "param": "Stereo", "widget": "knob" },
+        { "param": "Swing", "widget": "knob", "polarity": "bipolar" },
+        { "param": "Feel", "widget": "knob", "polarity": "bipolar" },
+        { "param": "Tape", "widget": "knob" },
+        { "param": "Output", "widget": "knob", "polarity": "bipolar" },
+        "empty"
+      ]
+    },
+    {
+      "name": "CLEAR",
+      "background": "qdelay-bg.png",
+      "controls": [
+        { "param": "Auto Clear", "widget": "switch" },
+        { "param": "Clear Fade", "widget": "knob" },
+        { "param": "Clear Thr", "widget": "knob" },
+        { "param": "Clear Amt", "widget": "knob" },
+        { "param": "Clear Hold", "widget": "knob" },
+        { "param": "Clear Src", "widget": "switch" },
+        "empty",
+        "empty",
+        { "param": "Duck Amt", "widget": "knob" },
+        { "param": "Duck Thr", "widget": "knob" },
+        { "param": "Duck Atk", "widget": "knob" },
+        { "param": "Duck Rel", "widget": "knob" }
+      ]
+    },
+    {
+      "name": "EQ",
+      "background": "qdelay-bg.png",
+      "controls": [
+        { "param": "EQ Low", "widget": "knob", "polarity": "bipolar" },
+        { "param": "EQ Mid", "widget": "knob", "polarity": "bipolar" },
+        { "param": "EQ High", "widget": "knob", "polarity": "bipolar" },
+        { "param": "Output", "widget": "knob", "polarity": "bipolar" },
+        { "widget": "text", "text": "Feedback EQ" },
+        "empty",
+        "empty",
+        "empty"
+      ]
+    }
+  ]
+}

@@ -15,7 +15,7 @@ public:
 	};
 
 	String dir;
-	inline static const std::array<Preset, 26> factoryPresets =
+	inline static const std::array<Preset, 34> factoryPresets =
     {{
         { "-- Init --", "", BinaryData::init_xml, BinaryData::init_xmlSize },
         { "16 Zone", "Basic", BinaryData::basic16zone_xml, BinaryData::basic16zone_xmlSize },
@@ -42,7 +42,15 @@ public:
         { "Duct Tape", "FX", BinaryData::fxducttape_xml, BinaryData::fxducttape_xmlSize },
         { "Metallizer", "FX", BinaryData::fxmetallizer_xml, BinaryData::fxmetallizer_xmlSize },
         { "Short Verb", "FX", BinaryData::fxshortreverb_xml, BinaryData::fxshortreverb_xmlSize },
-        { "Octaver", "FX", BinaryData::fxoctaver_xml, BinaryData::fxoctaver_xmlSize }
+        { "Octaver", "FX", BinaryData::fxoctaver_xml, BinaryData::fxoctaver_xmlSize },
+        { "Dub Chamber", "Dub", BinaryData::dubchamber_xml, BinaryData::dubchamber_xmlSize },
+        { "Tubby's Tape", "Dub", BinaryData::tubbystape_xml, BinaryData::tubbystape_xmlSize },
+        { "Thunder Dub", "Dub", BinaryData::thunderdub_xml, BinaryData::thunderdub_xmlSize },
+        { "Dub Siren", "Dub", BinaryData::dubsiren_xml, BinaryData::dubsiren_xmlSize },
+        { "Melodica Echo", "Dub", BinaryData::melodicaecho_xml, BinaryData::melodicaecho_xmlSize },
+        { "Spring Dub", "Dub", BinaryData::springdub_xml, BinaryData::springdub_xmlSize },
+        { "Dub Plate", "Dub", BinaryData::dubplate_xml, BinaryData::dubplate_xmlSize },
+        { "Auto Clear Throw", "Dub", BinaryData::autoclearthrow_xml, BinaryData::autoclearthrow_xmlSize }
     }};
 
 	PresetMgr(QDelayAudioProcessor& proc, String _dir);

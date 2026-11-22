@@ -23,6 +23,7 @@
 #include "dsp/Wow.h"
 #include "dsp/DelayLine.h"
 #include "dsp/Phaser.h"
+#include "dsp/AutoClear.h"
 #include "PresetMgr.h"
 
 using namespace globals;
@@ -42,6 +43,8 @@ public:
 		Saturation,
 		Tape,
 		LoFi,
+		PhaserTab,
+		AutoClearTab,
     };
 
     std::unique_ptr<Delay> delay;
@@ -68,6 +71,7 @@ public:
     AudioBuffer<float> distPreBuffer;
     AudioBuffer<float> distPostBuffer;
     Follower follower;
+    AutoClear autoClear;
     int eqPath = 0; // Input or output eq
     std::vector<SVF::EQBand> eqBands;
     std::vector<SVF> eqL;

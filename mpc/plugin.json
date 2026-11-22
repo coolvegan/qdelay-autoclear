@@ -1,0 +1,16 @@
+{
+  "name": "QDelay",
+  "manufacturer": "Tilr",
+  "version": "1.3.0",
+  "format": "vst2",
+  "kind": "effect",
+  "uid": "qdel",
+  "numInputs": 2,
+  "numOutputs": 2,
+  "category": "Delay",
+  "file32": "VST/qdelay-arm32.so",
+  "file64": "VST/qdelay-arm64.so",
+  "description": "Dual dub delay with tempo sync, ping-pong, diffusion, saturation, tape, ducking and smooth note-triggered Auto Clear. 11 built-in programs incl. nine dub presets.",
+  "author": "Tilr",
+  "license": "MIT"
+}

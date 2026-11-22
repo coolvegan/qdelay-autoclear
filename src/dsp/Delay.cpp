@@ -66,6 +66,28 @@ void Delay::clear()
     }
 }
 
+void Delay::clearExceptRecent(int keepSamples)
+{
+    predelayL.clearExceptRecent(keepSamples);
+    predelayR.clearExceptRecent(keepSamples);
+    delayL.clearExceptRecent(keepSamples);
+    delayR.clearExceptRecent(keepSamples);
+    swingL.clearExceptRecent(keepSamples);
+    swingR.clearExceptRecent(keepSamples);
+    haasL.clearExceptRecent(keepSamples);
+    haasR.clearExceptRecent(keepSamples);
+    haasSwingL.clearExceptRecent(keepSamples);
+    haasSwingR.clearExceptRecent(keepSamples);
+    std::fill(revL.begin(), revL.end(), 0.f);
+    std::fill(revR.begin(), revR.end(), 0.f);
+    revposL = 0;
+    revposR = 0;
+    shifter->clear();
+    shifterSwing->clear();
+    phaser->clear();
+    phaserSwing->clear();
+}
+
 void Delay::prepare(float _srate)
 {
     srate = _srate;

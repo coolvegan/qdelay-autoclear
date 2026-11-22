@@ -5,10 +5,11 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET 10.13 CACHE STRING "Build for 10.13")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(BUILD_STANDALONE "Build Standalone plugin format" ON)
+option(BUILD_VST2 "Build VST2 plugin format" ON)
 option(BUILD_VST3 "Build VST3 plugin format" ON)
 option(BUILD_LV2 "Build LV2 plugin format" ON)
 
-project(QDelay VERSION 1.2.3)
+project(QDelay VERSION 1.3.0)
 
 add_compile_definitions(PROJECT_VERSION="${PROJECT_VERSION}")
 set(CMAKE_CXX_STANDARD 20)
@@ -17,7 +18,22 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 add_subdirectory(libs/JUCE)
 
+# VST2 is not shipped with JUCE because Steinberg no longer distributes the SDK.
+# Point this at a local VST 2.4 SDK checkout (pluginterfaces/vst2.x/...).
+if(BUILD_VST2)
+    set(QDELAY_VST2_SDK "${CMAKE_CURRENT_SOURCE_DIR}/third_party/vst2sdk" CACHE PATH "Path to the VST 2.4 SDK")
+    if(EXISTS "${QDELAY_VST2_SDK}/pluginterfaces/vst2.x/aeffect.h")
+        juce_set_vst2_sdk_path("${QDELAY_VST2_SDK}")
+    else()
+        message(FATAL_ERROR "BUILD_VST2 is ON but the VST2 SDK was not found at ${QDELAY_VST2_SDK}")
+    endif()
+endif()
+
 set(plugin_formats AU)
+
+if(BUILD_VST2)
+    list(APPEND plugin_formats VST)
+endif()
 
 if(BUILD_STANDALONE)
     list(APPEND plugin_formats Standalone)
@@ -34,7 +50,7 @@ endif()
 juce_add_plugin(${PROJECT_NAME}
         COMPANY_NAME Tilr
         IS_SYNTH FALSE
-        NEEDS_MIDI_INPUT False
+        NEEDS_MIDI_INPUT True
         NEEDS_MIDI_OUTPUT false
         IS_MIDI_EFFECT FALSE
         EDITOR_WANTS_KEYBOARD_FOCUS FALSE

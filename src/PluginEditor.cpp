@@ -18,6 +18,7 @@ QDelayAudioProcessorEditor::QDelayAudioProcessorEditor (QDelayAudioProcessor& p)
     audioProcessor.params.addParameterListener("pan_dry_sum", this);
     audioProcessor.params.addParameterListener("pan_wet_sum", this);
     audioProcessor.params.addParameterListener("shifter_mode", this);
+    audioProcessor.params.addParameterListener("autoclear", this);
 
     // NAVBAR
     int col = PLUG_PADDING;
@@ -261,6 +262,23 @@ QDelayAudioProcessorEditor::QDelayAudioProcessorEditor (QDelayAudioProcessor& p)
     addAndMakeVisible(duckMeter.get());
     duckMeter->setBounds(col + KNOB_WIDTH, row + KNOB_HEIGHT * 2 + 15, KNOB_WIDTH, VSEPARATOR);
 
+    addAndMakeVisible(autoClearBtn);
+    autoClearBtn.setComponentID("button");
+    autoClearBtn.setButtonText("AUTO");
+    autoClearBtn.setBounds(col + KNOB_WIDTH * 2, row + KNOB_HEIGHT * 2 + 5, KNOB_WIDTH, 17);
+    autoClearBtn.setTooltip("Fade out and clear the delay tail whenever a new note arrives.");
+    autoClearBtn.onClick = [this]
+        {
+            auto param = audioProcessor.params.getParameter("autoclear");
+            bool turnOn = param->getValue() <= 0.f;
+            param->setValueNotifyingHost(turnOn ? 1.f : 0.f);
+            if (turnOn)
+            {
+                audioProcessor.rightTab = QDelayAudioProcessor::RightTab::AutoClearTab;
+                toggleUIComponents();
+            }
+        };
+
     addAndMakeVisible(pitchMix);
     pitchMixAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.params, "pitch_mix", pitchMix);
     pitchMix.setComponentID("pitch_mix");
@@ -307,6 +325,10 @@ QDelayAudioProcessorEditor::QDelayAudioProcessorEditor (QDelayAudioProcessor& p)
     addChildComponent(phaserWidget.get());
     phaserWidget->setBounds(tapeWidget->getBounds());
 
+    autoClearWidget = std::make_unique<AutoClearWidget>(*this);
+    addChildComponent(autoClearWidget.get());
+    autoClearWidget->setBounds(tapeWidget->getBounds());
+
     addAndMakeVisible(rightTabBtn);
     rightTabBtn.setAlpha(0.0f);
     rightTabBtn.setBounds(col, row + 4, 100, 25);
@@ -343,6 +365,7 @@ QDelayAudioProcessorEditor::~QDelayAudioProcessorEditor()
     audioProcessor.params.removeParameterListener("reverse", this);
     audioProcessor.params.removeParameterListener("pan_dry_sum", this);
     audioProcessor.params.removeParameterListener("pan_wet_sum", this);
+    audioProcessor.params.removeParameterListener("autoclear", this);
 }
 
 void QDelayAudioProcessorEditor::changeListenerCallback(ChangeBroadcaster* source)
@@ -386,6 +409,10 @@ void QDelayAudioProcessorEditor::toggleUIComponents()
     tapeWidget->setVisible(audioProcessor.rightTab == 2);
     lofiWidget->setVisible(audioProcessor.rightTab == 3);
     phaserWidget->setVisible(audioProcessor.rightTab == 4);
+    autoClearWidget->setVisible(audioProcessor.rightTab == 5);
+
+    bool autoClear = (bool) audioProcessor.params.getRawParameterValue("autoclear")->load();
+    autoClearBtn.setToggleState(autoClear, dontSendNotification);
 
     bool reverse = (bool)audioProcessor.params.getRawParameterValue("reverse")->load();
     feel->setAlpha(reverse ? 0.5f : 1.f);
@@ -446,7 +473,8 @@ void QDelayAudioProcessorEditor::paint (Graphics& g)
     UIUtils::drawTriangle(g, rightTabBtn.getBounds().toFloat().withWidth(25.f).reduced(8.f), 2, Colour(COLOR_ACTIVE));
     g.setColour(Colour(COLOR_ACTIVE));
     int tab = audioProcessor.rightTab;
-    g.drawText(tab == 0 ? "EQ" : tab == 1 ? "SAT" : tab == 2 ? "TAPE" : tab == 3 ? "LOFI" : "PHASER", rightTabBtn.getBounds()
+    const char* tabNames[] = { "EQ", "SAT", "TAPE", "LOFI", "PHASER", "CLEAR" };
+    g.drawText(tab >= 0 && tab < 6 ? tabNames[tab] : "EQ", rightTabBtn.getBounds()
         .toFloat().withTrimmedLeft(25.f), Justification::centredLeft);
 
     if (audioProcessor.delayTab == 1)
@@ -615,6 +643,7 @@ void QDelayAudioProcessorEditor::showRightTabMenu()
     menu.addItem(3, "Tape", true, tab == 2);
     menu.addItem(4, "LoFi", true, tab == 3);
     menu.addItem(5, "Phaser", true, tab == 4);
+    menu.addItem(6, "Auto Clear", true, tab == 5);
 
     auto menuPos = localPointToGlobal(rightTabBtn.getBounds().getBottomLeft());
     menu.showMenuAsync(PopupMenu::Options()
@@ -634,6 +663,7 @@ void QDelayAudioProcessorEditor::showPresetsMenu()
     PopupMenu menu;
     PopupMenu basicPresets;
     PopupMenu drumsPresets;
+    PopupMenu dubPresets;
     PopupMenu fxPresets;
     for (int i = 0; i < PresetMgr::factoryPresets.size(); ++i)
     {
@@ -644,12 +674,15 @@ void QDelayAudioProcessorEditor::showPresetsMenu()
             basicPresets.addItem(i + 1, preset.name, true, audioProcessor.presetName == preset.name);
         else if (preset.category == "Drums")
             drumsPresets.addItem(i + 1, preset.name, true, audioProcessor.presetName == preset.name);
+        else if (preset.category == "Dub")
+            dubPresets.addItem(i + 1, preset.name, true, audioProcessor.presetName == preset.name);
         else if (preset.category == "FX")
             fxPresets.addItem(i + 1, preset.name, true, audioProcessor.presetName == preset.name);
     }
 
     menu.addSubMenu("Basic", basicPresets);
     menu.addSubMenu("Drums", drumsPresets);
+    menu.addSubMenu("Dub", dubPresets);
     menu.addSubMenu("FX", fxPresets);
 
     PopupMenu userMenu;

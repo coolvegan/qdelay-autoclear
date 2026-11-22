@@ -20,9 +20,15 @@ Tilr, extended with:
 
 ## Demo
 
+### Demo 1 — QDelay Auto Clear
+
 [![QDelay Auto Clear demo](https://img.youtube.com/vi/-ITKMPyjpXE/maxresdefault.jpg)](https://www.youtube.com/watch?v=-ITKMPyjpXE)
 
-*Click the preview to watch the demo on YouTube.*
+### Demo 2 — Under One Sun — Best Message Ever
+
+[![Under One Sun — Best Message Ever — QDelay on Vocals, Drums and Piano](https://img.youtube.com/vi/n9H5ckHoVq4/maxresdefault.jpg)](https://youtube.com/shorts/n9H5ckHoVq4)
+
+*Under One Sun — Best Message Ever: QDelay on vocals, drums and piano. Click either preview to watch on YouTube.*
 
 ## Auto Clear
 

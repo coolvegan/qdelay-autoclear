@@ -72,6 +72,14 @@ changes the echo character; turn it on when a clear should remove the tail.
 
 Switching modes is crossfaded over 25 ms, so it cannot click while audio runs.
 
+### Feedback EQ
+
+The three EQ bands (low shelf 120 Hz, bell 800 Hz, high shelf 4.5 kHz) sit in
+the feedback path. They shape every repeat from the second echo on; the dry
+signal and the first echo are untouched. At low feedback the EQ is therefore
+subtle by design. Put the delay on a return or raise the feedback if you want
+to hear the bands clearly.
+
 The MPC skin shows **100% = kill** on the CLEAR page. Auto Clear is enabled by
 default in the MPC build; **Dub Clean** is the preset that intentionally turns
 it off.

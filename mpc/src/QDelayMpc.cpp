@@ -43,22 +43,19 @@ public:
     void prepare (double sampleRate)
     {
         srate = (float) std::max (8000.0, sampleRate);
-        fastAttack  = 1.0f - std::exp (-1.0f / (0.001f * srate));
-        fastRelease = 1.0f - std::exp (-1.0f / (0.050f * srate));
-        slowAttack  = 1.0f - std::exp (-1.0f / (0.060f * srate));
-        slowRelease = 1.0f - std::exp (-1.0f / (0.400f * srate));
+        detAttack  = 1.0f - std::exp (-1.0f / (0.005f * srate));
+        detRelease = 1.0f - std::exp (-1.0f / (0.300f * srate));
+        duckAttack = 1.0f - std::exp (-1.0f / (0.005f * srate));
         reset();
     }
 
     void reset()
     {
-        state = State::idle;
+        env = 0.0f;
         gain = 1.0f;
-        fastEnv = slowEnv = 0.0f;
-        refractory = std::max (1, (int) (0.06f * srate));
-        sinceTrigger = refractory;   // the very first note may trigger immediately
+        holdCounter = 0;
+        resetDone = false;
         tailEnv = 0.0f;
-        muteWrites = false;
     }
 
     // MPC effects never receive MIDI: Auto Clear is always audio-triggered.
@@ -66,160 +63,110 @@ public:
     {
         enabled = enabled_;
         fadeMs = clamp (fadeMs_, 2.0f, 1000.0f);
-        holdMs = clamp (holdMs_, 0.0f, 2000.0f);
+        holdSamples = std::max (0, (int) (clamp (holdMs_, 0.0f, 2000.0f) * 0.001f * srate));
         amount = clamp (amount_, 0.0f, 1.0f);
         threshold = std::pow (10.0f, clamp (thresholdDb_, -80.0f, 0.0f) / 20.0f);
 
+        // The release is the user's Clear Fade. There is no binary gate any
+        // more: the gain follows the detector continuously, so a duck cannot
+        // flutter between open and closed at the end of a phrase.
+        release = 1.0f - std::exp (-1.0f / (fadeMs * 0.001f * srate));
+
         if (! enabled || amount <= 0.0001f)
         {
-            state = State::idle;
+            env = 0.0f;
             gain = 1.0f;
-            muteWrites = false;
+            holdCounter = 0;
+            resetDone = false;
         }
     }
 
     /**
         Returns the wet gain for this sample.
 
-        clearNow  - set once when a 100% clear must wipe the whole delay line.
-        muteWrites- set while the kill is active, so the caller writes zeros
-                    into the delay/feedback loop instead of refilling it.
+        clearNow - set once when a 100% clear must wipe the whole delay line.
     */
-    float process (float left, float right, bool& clearNow, bool& muteWrites_)
+    float process (float left, float right, bool& clearNow)
     {
         clearNow = false;
-        muteWrites_ = false;
 
         if (! enabled || amount <= 0.0001f)
         {
-            state = State::idle;
+            env = 0.0f;
             gain = 1.0f;
-            muteWrites = false;
+            holdCounter = 0;
+            resetDone = false;
             return 1.0f;
         }
 
         const float peak = std::max (std::abs (left), std::abs (right));
-        fastEnv += (peak > fastEnv ? fastAttack : fastRelease) * (peak - fastEnv);
-        slowEnv += (peak > slowEnv ? slowAttack : slowRelease) * (peak - slowEnv);
+        env += (peak > env ? detAttack : detRelease) * (peak - env);
 
-        // Adaptive onset detector. The absolute threshold is only a floor;
-        // the real trigger is a rise against the running level. This works
-        // for a new note over a sustained pad or a busy mix, not just for a
-        // clean transient in silence.
-        // Only kill when there is actually a delay tail to kill. This keeps
-        // the first note after loading from erasing its own first repeat.
+        // Soft knee from the threshold up 12 dB; zero slope at both ends.
+        const float low = threshold;
+        const float high = threshold * 4.0f;
+        float x = clamp ((env - low) / (high - low), 0.0f, 1.0f);
+        x = x * x * (3.0f - 2.0f * x);
+
+        // Without a tail there is nothing to clear, and ducking would eat the
+        // first repeat's own attack.
         const bool hasTail = tailEnv > 0.0005f;
-        const bool aboveFloor = peak > threshold;
-        const bool rising = (fastEnv > slowEnv * 1.30f) || (peak > slowEnv * 1.45f);
-        if (hasTail && aboveFloor && rising && sinceTrigger > refractory && state != State::fadingOut)
-            trigger();
+        const float target = hasTail ? 1.0f - amount * x : 1.0f;
 
-        if (sinceTrigger < 0x3fffffff)
-            ++sinceTrigger;
-
-        switch (state)
+        if (target < gain)
         {
-            case State::idle:
-                gain = 1.0f;
-                break;
-
-            case State::fadingOut:
-                gain -= fadeStep;
-                if (gain <= fadeFloor)
-                {
-                    gain = fadeFloor;
-                    clearNow = kill;
-                    if (kill)
-                        tailEnv = 0.0f;
-                    held = (int) (holdMs * 0.001f * srate);
-                    if (held > 0)
-                    {
-                        state = State::holding;
-                    }
-                    else
-                    {
-                        state = State::fadingIn;
-                        prepareFadeIn();
-                        muteWrites = false;
-                    }
-                }
-                break;
-
-            case State::holding:
-                if (--held <= 0)
-                {
-                    state = State::fadingIn;
-                    prepareFadeIn();
-                    muteWrites = false;
-                }
-                break;
-
-            case State::fadingIn:
-                gain += fadeStep;
-                if (gain >= 1.0f)
-                {
-                    gain = 1.0f;
-                    state = State::idle;
-                    muteWrites = false;
-                }
-                break;
+            gain += duckAttack * (target - gain);
+            holdCounter = holdSamples;
+        }
+        else if (holdCounter > 0)
+        {
+            --holdCounter;                        // hold the duck, then release
+        }
+        else
+        {
+            gain += release * (target - gain);
         }
 
-        muteWrites_ = muteWrites;
+        gain = clamp (gain, 0.0f, 1.0f);
+
+        // At 100% the tank is wiped once, only when the duck is effectively
+        // silent. The re-arm waits for a real quiet gap.
+        if (amount > 0.999f)
+        {
+            if (! resetDone && hasTail && gain < 0.002f && x > 0.80f)
+            {
+                clearNow = true;
+                resetDone = true;
+            }
+            if (env < low * 0.5f && gain > 0.99f)
+                resetDone = false;
+        }
+
         return gain;
     }
 
-private:
-    enum class State { idle, fadingOut, holding, fadingIn };
-
-    void trigger()
-    {
-        sinceTrigger = 0;
-        kill = amount > 0.999f;
-        fadeFloor = kill ? 0.0f : 1.0f - amount;
-        const float outMs = kill ? 2.0f : fadeMs;
-        fadeOutSamples = std::max (1, (int) (outMs * 0.001f * srate));
-        fadeStep = std::max (1.0e-6f, (gain - fadeFloor) / (float) fadeOutSamples);
-        if (gain <= fadeFloor)
-            gain = fadeFloor;
-        muteWrites = kill;
-        state = State::fadingOut;
-    }
-
-    void prepareFadeIn()
-    {
-        const int samples = std::max (1, (int) (fadeMs * 0.001f * srate));
-        fadeStep = std::max (1.0e-6f, (1.0f - gain) / (float) samples);
-    }
-
-    State state = State::idle;
-    float srate = 44100.0f;
-    bool enabled = false;
-    float amount = 1.0f;
-    float fadeMs = 20.0f;
-    float holdMs = 1.0f;
-    float threshold = 0.0056f;
-    float gain = 1.0f;
-    float fadeStep = 0.01f;
-    float fadeFloor = 0.0f;
-    int fadeOutSamples = 1;
-    int held = 0;
-    float fastEnv = 0.0f;
-    float slowEnv = 0.0f;
-    float tailEnv = 0.0f;
-    float fastAttack = 0.01f, fastRelease = 0.001f;
-    float slowAttack = 0.001f, slowRelease = 0.0001f;
-    int sinceTrigger = 0;
-    int refractory = 4000;
-    bool kill = false;
-    bool muteWrites = false;
-public:
     // Called by the processor with the delay output so Auto Clear knows
     // whether there is a tail worth killing.
     void observeWet (float peak)
     {
         tailEnv += (peak > tailEnv ? 0.02f : 0.00015f) * (peak - tailEnv);
     }
+
+private:
+    float srate = 44100.0f;
+    bool enabled = false;
+    float amount = 1.0f;
+    float fadeMs = 20.0f;
+    float threshold = 0.0056f;
+    float gain = 1.0f;
+    float env = 0.0f;
+    float tailEnv = 0.0f;
+    int holdCounter = 0;
+    int holdSamples = 0;
+    float detAttack = 0.01f, detRelease = 0.001f;
+    float duckAttack = 0.01f;
+    float release = 0.001f;
+    bool resetDone = false;
 };
 
 // ---------------------------------------------------------------------------
@@ -346,17 +293,21 @@ private:
     float env = 0.0f;
 };
 
-// Transparent below -0.9 dBFS, gently limits the last 0.9 dB so the plugin
-// can never send > 0 dBFS into the MPC mixer.
-inline float softLimit (float x)
+// Output limiter. The knee sits at -0.35 dBFS instead of -0.92 dBFS, so the
+// clipper is a safety net instead of a constant effect.
+constexpr float kLimitKnee = 0.96f;
+constexpr int   kOsLatency = 6;   // measured group delay of Limiter2x
+
+inline float softClipKnee (float x, float knee)
 {
-    constexpr float knee = 0.9f;
     const float a = std::fabs (x);
     if (a <= knee)
         return x;
     const float y = knee + (1.0f - knee) * fastTanh ((a - knee) / (1.0f - knee));
     return x < 0.0f ? -y : y;
 }
+
+inline float softLimit (float x) { return softClipKnee (x, kLimitKnee); }
 
 // ---------------------------------------------------------------------------
 // 2x oversampled feedback saturation
@@ -446,6 +397,84 @@ private:
     int write = 0;
 };
 
+// ---------------------------------------------------------------------------
+// 2x oversampled output limiter
+// ---------------------------------------------------------------------------
+// Same 15-tap halfband FIR as Sat2x, but around the output soft clipper. A hot
+// feedback sum would otherwise fold the clipper harmonics back into the
+// audible band, which is heard as a coarse, stuttering tail.
+class Limiter2x
+{
+public:
+    static constexpr int N = 15;
+    static constexpr int Ring = 32;
+
+    Limiter2x() { build(); }
+
+    void reset()
+    {
+        up.fill (0.0f);
+        down.fill (0.0f);
+        write = 0;
+    }
+
+    float process (float x)
+    {
+        up[(size_t) write] = x;
+        up[(size_t) ((write + 1) & (Ring - 1))] = 0.0f;
+
+        float y0 = 0.0f, y1 = 0.0f;
+        for (int k = 0; k < N; ++k)
+        {
+            const int a = (write - k) & (Ring - 1);
+            const int b = (write + 1 - k) & (Ring - 1);
+            y0 += h[k] * up[(size_t) a];
+            y1 += h[k] * up[(size_t) b];
+        }
+
+        y0 *= 2.0f;
+        y1 *= 2.0f;
+
+        down[(size_t) write] = softLimit (y0);
+        down[(size_t) ((write + 1) & (Ring - 1))] = softLimit (y1);
+
+        float out = 0.0f;
+        for (int k = 0; k < N; ++k)
+            out += h[k] * down[(size_t) ((write + 1 - k) & (Ring - 1))];
+
+        write = (write + 2) & (Ring - 1);
+
+        // Decimation can overshoot after clipping; catch it.
+        return softClipKnee (out, 0.995f);
+    }
+
+private:
+    void build()
+    {
+        const int M = N / 2;
+        double sum = 0.0;
+        for (int n = 0; n < N; ++n)
+        {
+            const double x = (double) (n - M);
+            const double sinc = std::fabs (x) < 1.0e-9 ? 1.0
+                             : std::sin (kPi * 0.5 * x) / (kPi * 0.5 * x);
+            const double w = 0.42
+                           - 0.5 * std::cos (2.0 * kPi * n / (N - 1))
+                           + 0.08 * std::cos (4.0 * kPi * n / (N - 1));
+            h[n] = (float) (0.5 * sinc * w);
+            sum += h[n];
+        }
+        if (sum > 1.0e-9)
+            for (float& v : h)
+                v = (float) (v / sum);
+        reset();
+    }
+
+    std::array<float, N> h {};
+    std::array<float, Ring> up {}, down {};
+    int write = 0;
+};
+
 } // namespace
 
 // ===========================================================================
@@ -460,7 +489,7 @@ public:
         pMode, pWidth, pStereo, pSwing, pFeel, pTape, pOutput,
         pLowCut, pHighCut, pDrive, pTone, pDiffAmt, pDiffSize, pModDepth, pModRate,
         pEqLow, pEqMid, pEqHigh, pDuckAmt, pDuckThres, pDuckAtk, pDuckRel,
-        pAutoClear, pClearFade, pClearThresh, pClearHold, pClearAmt,
+        pAutoClear, pClearFade, pClearThresh, pClearHold, pClearAmt, pOsOut,
         kNumParams
     };
 
@@ -470,11 +499,12 @@ public:
         i.name = "QDelay";
         i.vendor = "Tilr";
         i.uniqueId = MPC_FOURCC ('q', 'd', 'e', 'l');
-        i.version = 1301;
+        i.version = 1302;
         i.isInstrument = false;
         i.numInputs = 2;
         i.numOutputs = 2;
-        i.wantsMidi = false;       // MPC effects never receive MIDI
+        i.wantsMidi = false;                    // MPC effects never receive MIDI
+        i.latencySamples = kOsLatency;          // output limiter runs at 2x
         return i;
     }
 
@@ -520,6 +550,7 @@ public:
         addParam (floatParam ("clear_thr", "Clear Thr", -60.0f, 0.0f, -45.0f, "dB", 1));
         addParam (logParam ("clear_hold", "Clear Hold", 1.0f, 1000.0f, 1.0f, "ms", 0));
         addParam (floatParam ("clear_amt", "Clear Amt", 0.0f, 100.0f, 100.0f, "%", 0));
+        addParam (boolParam ("os_out", "OS 2x", true));
 
         addPrograms();
     }
@@ -578,6 +609,9 @@ public:
 
     void reset() override
     {
+        limL.reset();
+        limR.reset();
+        osOutActive = getBool (pOsOut);
         delayL.reset();
         delayR.reset();
         diffL.reset();
@@ -633,6 +667,14 @@ public:
 
         const float sr = (float) ctx.sampleRate;
         const float bpm = safeBpm (ctx.transport.bpm);
+
+        const bool osOut = getBool (pOsOut);
+        if (osOut != osOutActive)
+        {
+            osOutActive = osOut;
+            limL.reset();
+            limR.reset();
+        }
 
         // ---- per-block parameter targets --------------------------------
         const bool sync = getBool (pSync);
@@ -718,10 +760,10 @@ public:
             const float dryL = inL ? inL[i] : 0.0f;
             const float dryR = inR ? inR[i] : 0.0f;
 
-            // Auto Clear must be evaluated before the delay write so a full
-            // kill can mute the loop and wipe the line at zero gain.
-            bool clearNow = false, muteWrites = false;
-            const float autoClearGain = autoClear.process (dryL, dryR, clearNow, muteWrites);
+            // Auto Clear must be evaluated before the delay write so its gain
+            // can drain the feedback loop and a full kill can wipe the line.
+            bool clearNow = false;
+            const float autoClearGain = autoClear.process (dryL, dryR, clearNow);
             if (clearNow)
             {
                 // Full kill: wipe the line and every stateful block around it,
@@ -780,6 +822,12 @@ public:
             fbL = dcL.process (fbL);
             fbR = dcR.process (fbR);
 
+            // Scale the feedback too, not just the output: a duck must remove
+            // energy from the loop, otherwise the old tail reappears when the
+            // gain opens again and that sounds like stuttering.
+            fbL *= autoClearGain;
+            fbR *= autoClearGain;
+
             const float fz = freezeSmooth.process();
             float fb = feedback.process();
             fb = fb + (0.995f - fb) * fz;
@@ -820,12 +868,6 @@ public:
                 writeR = fbL * fb;
             }
 
-            if (muteWrites)
-            {
-                writeL = 0.0f;
-                writeR = 0.0f;
-            }
-
             if (std::fabs (writeL) > 1.0f) writeL = softClip (writeL);
             if (std::fabs (writeR) > 1.0f) writeR = softClip (writeR);
 
@@ -857,8 +899,16 @@ public:
 
             float yL = dryL * dryGain + wetL * wetGain;
             float yR = dryR * dryGain + wetR * wetGain;
-            yL = softLimit (flushDenormal (yL * og));
-            yR = softLimit (flushDenormal (yR * og));
+            if (osOutActive)
+            {
+                yL = limL.process (flushDenormal (yL * og));
+                yR = limR.process (flushDenormal (yR * og));
+            }
+            else
+            {
+                yL = softLimit (flushDenormal (yL * og));
+                yR = softLimit (flushDenormal (yR * og));
+            }
 
             outL[i] = yL;
             if (outR && outR != outL)
@@ -1019,6 +1069,8 @@ private:
 
     AutoClear autoClear;
     DuckFollower duck;
+    Limiter2x limL, limR;
+    bool osOutActive = true;
 
     float maxDelaySamples = 176400.0f;
     float modPhase = 0.0f;

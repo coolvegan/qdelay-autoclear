@@ -47,7 +47,7 @@
         { "param": "Feel", "widget": "knob", "polarity": "bipolar" },
         { "param": "Tape", "widget": "knob" },
         { "param": "Output", "widget": "knob", "polarity": "bipolar" },
-        "empty"
+        { "param": "OS 2x", "widget": "switch" }
       ]
     },
     {

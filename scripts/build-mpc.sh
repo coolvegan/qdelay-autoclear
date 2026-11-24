@@ -99,7 +99,7 @@ QDelay is an insert effect. Its UI is the MPC touchscreen skin in
 EOF
 
 cat > "$PKG/README.txt" <<'EOF'
-QDelay 1.3.1 - dual dub delay for Akai MPC
+QDelay 1.3.2 - dual dub delay for Akai MPC
 ==========================================
 
 A stereo dual delay built for dub: independent tempo-synced taps, normal /
@@ -109,11 +109,15 @@ note-triggered Auto Clear.
 
 Auto Clear (the AIR Delay Pro-style feature)
 --------------------------------------------
-At Clear Amt = 100% this is a true kill: a new note fades the wet path out in
-about 2 ms, mutes the send and feedback writes, clears the complete delay line,
-waits for Clear Hold and fades back in over the Clear Fade time. Nothing of the
-old tail survives, even at maximum feedback. At lower Clear Amt values the
-function is a smooth duck instead.
+Auto Clear is a continuous ducker, not a gate: the wet gain follows the note
+detector smoothly, holds for Clear Hold, then releases over the Clear Fade
+time. The gain scales the feedback as well as the output, so a duck really
+removes energy from the loop instead of hiding it and letting the old tail
+reappear when the gain opens again.
+
+At Clear Amt = 100% the delay line is wiped once, when the wet path is
+effectively silent, so nothing of the old tail survives even at maximum
+feedback. At lower values it is a smooth duck.
 
 MPC effects receive no MIDI, so the MPC build always triggers from the audio
 of the new note. Auto Clear is on by default; Dub Clean is the preset that
@@ -131,10 +135,16 @@ The hardware Q-Links follow the page layout; use the page function keys to
 switch pages. Feedback EQ is a low shelf at 120 Hz, a bell at 800 Hz and a
 high shelf at 4.5 kHz.
 
+OS 2x (SPACE page) runs the output limiter at twice the sample rate, so a hot
+feedback sum cannot fold the clipper harmonics back into the audible band.
+It adds 6 samples of latency, reported to the host. The knee sits at
+-0.35 dBFS, so below it the limiter is bit-transparent.
+
 Signal path:
   input -> diffusion (optional) -> dual delay -> feedback EQ / low+high cut
         -> saturation / tone -> back into the delay
   wet -> Auto Clear / duck -> stereo width -> mix -> output
+      -> 2x oversampled limiter
 EOF
 
 echo "== 6/6  validate and zip"
@@ -144,7 +154,7 @@ python3 - "$PKG" <<'PY'
 import os, shutil, sys
 pkg = sys.argv[1]
 root = os.path.dirname(os.path.dirname(pkg))
-archive = os.path.join(root, "Tilr - VST - QDelay-1.3.1")
+archive = os.path.join(root, "Tilr - VST - QDelay-1.3.2")
 shutil.make_archive(archive, "zip", os.path.dirname(pkg), os.path.basename(pkg))
 print("wrote " + archive + ".zip")
 PY

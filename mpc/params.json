@@ -1,5 +1,5 @@
 {
-  "name": "QDelay", "vendor": "Tilr", "uid": "qdel", "uidInt": 1902404972, "version": 1301,
+  "name": "QDelay", "vendor": "Tilr", "uid": "qdel", "uidInt": 1902404972, "version": 1302,
   "isInstrument": false, "numInputs": 2, "numOutputs": 2, "numPrograms": 11,
   "programs": ["Init", "Dub Chamber", "Tubby's Tape", "Thunder Dub", "Dub Siren", "Melodica Echo", "Spring Dub", "Dub Plate", "Auto Clear Throw", "Classic Pong", "Dub Clean"],
   "params": [
@@ -37,6 +37,7 @@
     {"index": 31, "id": null, "name": "Clear Fade", "label": "ms", "display": "20", "default": 0.417025, "automatable": true, "kind": "int", "choices": []},
     {"index": 32, "id": null, "name": "Clear Thr", "label": "dB", "display": "-45.0", "default": 0.25, "automatable": true, "kind": "float", "choices": []},
     {"index": 33, "id": null, "name": "Clear Hold", "label": "ms", "display": "1", "default": 0.0, "automatable": true, "kind": "int", "choices": []},
-    {"index": 34, "id": null, "name": "Clear Amt", "label": "%", "display": "100", "default": 1.0, "automatable": true, "kind": "int", "choices": []}
+    {"index": 34, "id": null, "name": "Clear Amt", "label": "%", "display": "100", "default": 1.0, "automatable": true, "kind": "int", "choices": []},
+    {"index": 35, "id": null, "name": "OS 2x", "label": "", "display": "On", "default": 1.0, "automatable": true, "kind": "bool", "choices": ["Off", "On"]}
   ]
 }

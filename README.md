@@ -36,13 +36,20 @@ Auto Clear is inspired by the AIR Delay Pro "Auto Clear" idea. On the MPC the
 effect is triggered by the audio of the new note; MPC effect plugins never
 receive MIDI. The desktop build can additionally use MIDI note-ons.
 
+The gain is a continuous function of the detector, not a gate. A binary
+active/hold/fade state machine used to flutter between duck and open at the
+end of a phrase; the gain now follows the note envelope smoothly, holds for
+the Hold time and releases over the Clear Fade time.
+
 At **Clear Amt = 100%** the function is a true kill:
 
 1. a new note is detected from the audio input
-2. the wet path fades to zero in about 2 ms
-3. the send and feedback writes are muted so the old loop cannot refill
-4. the complete delay line is cleared
-5. after the hold time the wet path fades back in over the Clear Fade time
+2. the wet gain ducks to zero in about 5 ms
+3. the gain scales the feedback as well as the output, so the loop really
+   loses the energy instead of only hiding it (and letting the old tail
+   reappear when the gain opens again)
+4. once the duck is silent the complete delay line is cleared once
+5. after the hold time the wet path releases over the Clear Fade time
 
 Nothing of the old tail survives, even at maximum feedback. At lower Clear Amt
 values the function behaves as a smooth duck instead of a full kill. Controls:
@@ -63,6 +70,7 @@ it off.
 - Diffusion with a true allpass chain
 - Modulation and tape wow/flutter
 - 2x oversampled feedback saturation
+- Switchable 2x oversampled output limiter (6 samples latency, reported)
 - Input ducking
 - Freeze with a click-free crossfade
 - Smooth, click-free parameter changes
@@ -201,6 +209,15 @@ input -> low/high cut -> diffusion -> dual delay
 | `scripts/` | build, VST2 SDK fetch and MPC install scripts |
 | `docker/` | cross-compilation images |
 | `cmake/toolchains/` | ARM64 Linux toolchain |
+
+## Versions
+
+- **1.3.2 (MPC)** / **1.3.1 (desktop)** — Auto Clear is now a continuous ducker
+  instead of a state machine (no more flutter at the end of a phrase), its gain
+  scales the feedback so the tail really decays, the 100% wipe happens once,
+  and the MPC output limiter has a switchable 2x oversampling stage with a
+  knee at -0.35 dBFS.
+- **1.3.0/1.3.1** — previous releases with the binary Auto Clear gate.
 
 ## Credits
 

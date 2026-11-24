@@ -7,13 +7,12 @@
 
 /**
     Auto Clear watches the dry input (and optionally incoming MIDI) for a new note
-    and fades the wet signal out, clears the delay line, then fades the wet signal
-    back in. Unlike a hard reset this cannot click: the line is only cleared once
-    the wet path has reached its (configurable) minimum gain.
+    and ducks the wet signal, holds, then releases over the Clear Fade time. At
+    100% the delay line is wiped once the wet path is effectively silent.
 
-    The detector is deliberately simple and robust for live use: a fast/slow
-    envelope pair finds transients, with a refractory window so a single hit or a
-    sustained pad only triggers once. MIDI note-ons can trigger it as well.
+    The gain is a continuous function of the detector, not a gate: there is no
+    active/hold/fade state machine, so the end of a phrase releases
+    monotonically instead of fluttering between duck and open.
 */
 class AutoClear
 {
@@ -23,21 +22,20 @@ public:
     void prepare (double sampleRate)
     {
         srate = (float) std::max (8000.0, sampleRate);
-        fastAttack  = 1.0f - std::exp (-1.0f / (0.001f  * srate));
-        fastRelease = 1.0f - std::exp (-1.0f / (0.050f  * srate));
-        slowAttack  = 1.0f - std::exp (-1.0f / (0.060f  * srate));
-        slowRelease = 1.0f - std::exp (-1.0f / (0.400f  * srate));
+        detAttack  = 1.0f - std::exp (-1.0f / (0.005f * srate));
+        detRelease = 1.0f - std::exp (-1.0f / (0.300f * srate));
+        duckAttack = 1.0f - std::exp (-1.0f / (0.005f * srate));
+        midiDecay  = 1.0f - std::exp (-1.0f / (0.300f * srate));
         reset();
     }
 
     void reset()
     {
-        state = State::idle;
+        env = 0.0f;
         gain = 1.0f;
-        fastEnv = 0.0f;
-        slowEnv = 0.0f;
-        sinceTrigger = 0;
-        refractorySamples = std::max (1, (int) (0.09f * srate));
+        holdCounter = 0;
+        midiEnv = 0.0f;
+        resetDone = false;
     }
 
     void setParameters (bool enabled_,
@@ -49,15 +47,21 @@ public:
     {
         enabled = enabled_;
         fadeMs = juce::jlimit (2.0f, 1000.0f, fadeMs_);
-        holdMs = juce::jlimit (0.0f, 2000.0f, holdMs_);
+        holdSamples = std::max (0, (int) (juce::jlimit (0.0f, 2000.0f, holdMs_) * 0.001f * srate));
         amount = juce::jlimit (0.0f, 1.0f, amount_);
         threshold = std::pow (10.0f, juce::jlimit (-80.0f, 0.0f, thresholdDb_) / 20.0f);
         source = juce::jlimit (0, 2, source_); // 0 audio, 1 midi, 2 both
 
+        // The release is the user's Clear Fade.
+        release = 1.0f - std::exp (-1.0f / (fadeMs * 0.001f * srate));
+
         if (! enabled || amount <= 0.0001f)
         {
-            state = State::idle;
+            env = 0.0f;
             gain = 1.0f;
+            holdCounter = 0;
+            midiEnv = 0.0f;
+            resetDone = false;
         }
     }
 
@@ -65,7 +69,7 @@ public:
     void beginBlock (bool midiNoteOn)
     {
         if (enabled && amount > 0.0001f && midiNoteOn && (source == 1 || source == 2))
-            trigger();
+            midiEnv = 1.0f;
     }
 
     /**
@@ -80,122 +84,84 @@ public:
 
         if (! enabled || amount <= 0.0001f)
         {
-            state = State::idle;
+            env = 0.0f;
             gain = 1.0f;
+            holdCounter = 0;
+            midiEnv = 0.0f;
+            resetDone = false;
             return 1.0f;
         }
 
         const float peak = std::max (std::abs (left), std::abs (right));
+        env += (peak > env ? detAttack : detRelease) * (peak - env);
+        midiEnv += midiDecay * (0.0f - midiEnv);
 
-        // transient detector
-        fastEnv += (peak > fastEnv ? fastAttack : fastRelease) * (peak - fastEnv);
-        slowEnv += (peak > slowEnv ? slowAttack : slowRelease) * (peak - slowEnv);
+        // Soft knee from the threshold up 12 dB; zero slope at both ends.
+        const float low = threshold;
+        const float high = threshold * 4.0f;
+        float x = juce::jlimit (0.0f, 1.0f, (env - low) / (high - low));
+        x = x * x * (3.0f - 2.0f * x);
+        if (source != 0)
+            x = std::max (x, midiEnv);
 
-        if (source == 0 || source == 2)
+        const float target = 1.0f - amount * x;
+
+        if (target < gain)
         {
-            const bool above = fastEnv > threshold || peak > threshold;
-            const bool transient = above
-                                && fastEnv > slowEnv * 2.2f
-                                && sinceTrigger > refractorySamples;
-
-            if (transient && state != State::fadingOut)
-                trigger();
+            gain += duckAttack * (target - gain);
+            holdCounter = holdSamples;
+        }
+        else if (holdCounter > 0)
+        {
+            --holdCounter;                        // hold the duck, then release
+        }
+        else
+        {
+            gain += release * (target - gain);
         }
 
-        if (sinceTrigger < 0x3fffffff)
-            ++sinceTrigger;
+        gain = juce::jlimit (0.0f, 1.0f, gain);
 
-        switch (state)
+        // At 100% the line is wiped once, only when the duck is silent.
+        if (amount > 0.999f)
         {
-            case State::idle:
-                gain = 1.0f;
-                break;
-
-            case State::fadingOut:
-                gain -= fadeStep;
-                if (gain <= fadeFloor)
-                {
-                    gain = fadeFloor;
-                    // clearing at minimum gain hides the line reset completely
-                    clearNow = amount > 0.999f;
-                    held = (int) (holdMs * 0.001f * srate);
-                    state = held > 0 ? State::holding : State::fadingIn;
-                    if (state == State::fadingIn)
-                        prepareFadeIn();
-                }
-                break;
-
-            case State::holding:
-                if (--held <= 0)
-                {
-                    state = State::fadingIn;
-                    prepareFadeIn();
-                }
-                break;
-
-            case State::fadingIn:
-                gain += fadeStep;
-                if (gain >= 1.0f)
-                {
-                    gain = 1.0f;
-                    state = State::idle;
-                }
-                break;
+            if (! resetDone && gain < 0.002f && x > 0.80f)
+            {
+                clearNow = true;
+                resetDone = true;
+            }
+            if (env < low * 0.5f && midiEnv < 0.01f && gain > 0.99f)
+                resetDone = false;
         }
 
         return gain;
     }
 
     float getGain() const noexcept { return gain; }
-    bool isActive() const noexcept { return state != State::idle; }
+    bool isActive() const noexcept { return gain < 0.999f; }
 
     // Samples immediately before the write head that must survive a clear:
     // this is the new note's attack plus a safety margin.
-    int recentSamples() const noexcept { return fadeOutSamples + 64; }
+    int recentSamples() const noexcept
+    {
+        return std::max (1, (int) (0.012f * srate)) + 64;
+    }
 
 private:
-    enum class State { idle, fadingOut, holding, fadingIn };
-
-    void trigger()
-    {
-        sinceTrigger = 0;
-        fadeFloor = 1.0f - amount;
-        // Full clears fade out quickly (the new attack is preserved), then
-        // fade back in over the user's fade time. Partial ducks use the full
-        // fade time in both directions.
-        const float outMs = amount > 0.999f ? std::min (fadeMs, 12.0f) : fadeMs;
-        fadeOutSamples = std::max (1, (int) (outMs * 0.001f * srate));
-        fadeStep = std::max (1.0e-6f, (gain - fadeFloor) / (float) fadeOutSamples);
-        if (gain <= fadeFloor)
-            gain = fadeFloor;
-        state = State::fadingOut;
-    }
-
-    void prepareFadeIn()
-    {
-        const int samples = std::max (1, (int) (fadeMs * 0.001f * srate));
-        fadeStep = std::max (1.0e-6f, (1.0f - gain) / (float) samples);
-        if (gain >= 1.0f)
-            gain = 1.0f;
-    }
-
-    State state = State::idle;
     float srate = 44100.0f;
     bool enabled = false;
     int source = 2;
     float amount = 1.0f;
     float fadeMs = 40.0f;
-    float holdMs = 0.0f;
     float threshold = 0.01f;
     float gain = 1.0f;
-    float fadeStep = 0.01f;
-    float fadeFloor = 0.0f;
-    int fadeOutSamples = 1;
-    int held = 0;
-    float fastEnv = 0.0f;
-    float slowEnv = 0.0f;
-    float fastAttack = 0.01f, fastRelease = 0.001f;
-    float slowAttack = 0.001f, slowRelease = 0.0001f;
-    int sinceTrigger = 0;
-    int refractorySamples = 4000;
+    float env = 0.0f;
+    float midiEnv = 0.0f;
+    int holdCounter = 0;
+    int holdSamples = 0;
+    float detAttack = 0.01f, detRelease = 0.001f;
+    float duckAttack = 0.01f;
+    float release = 0.001f;
+    float midiDecay = 0.001f;
+    bool resetDone = false;
 };

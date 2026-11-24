@@ -147,6 +147,7 @@ AudioProcessorValueTreeState::ParameterLayout QDelayAudioProcessor::createParame
     layout.add(std::make_unique<AudioParameterFloat>("clear_hold", "Auto Clear Hold", NormalisableRange<float>(0.f, 1000.f, 1.f, 0.5f), 0.f));
     layout.add(std::make_unique<AudioParameterFloat>("clear_amt", "Auto Clear Amount", 0.f, 1.f, 1.0f));
     layout.add(std::make_unique<AudioParameterChoice>("clear_source", "Auto Clear Source", StringArray{ "Audio", "MIDI", "Audio + MIDI" }, 2));
+    layout.add(std::make_unique<AudioParameterChoice>("clear_mode", "Auto Clear Mode", StringArray{ "Transient", "Ducker" }, 0));
 
     return layout;
 }
@@ -460,7 +461,8 @@ void QDelayAudioProcessor::onSlider()
         params.getRawParameterValue("clear_thresh")->load(),
         params.getRawParameterValue("clear_hold")->load(),
         params.getRawParameterValue("clear_amt")->load(),
-        (int) params.getRawParameterValue("clear_source")->load());
+        (int) params.getRawParameterValue("clear_source")->load(),
+        (int) params.getRawParameterValue("clear_mode")->load());
 
     // prepare input EQ
     eqPath = (int)params.getRawParameterValue("eq_path")->load();

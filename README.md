@@ -53,8 +53,24 @@ At **Clear Amt = 100%** the function is a true kill:
 
 Nothing of the old tail survives, even at maximum feedback. At lower Clear Amt
 values the function behaves as a smooth duck instead of a full kill. Controls:
-**Auto Clear**, **Fade**, **Threshold**, **Hold**, **Amount**. The desktop build
-also has a **Source** selector (Audio / MIDI / both); the MPC skin is audio-only.
+**Auto Clear**, **Fade**, **Threshold**, **Hold**, **Amount**, **Clear Mode** and
+**Clear in Feedback**. The desktop build also has a **Source** selector
+(Audio / MIDI / both); the MPC skin is audio-only.
+
+### Clear Mode
+
+Two behaviours share the same controls, selectable per instance:
+
+| Mode | Behaviour |
+|---|---|
+| **Transient** (default) | fast/slow detector with a 60 ms refractory: ducks once per hit, holds, then ramps back. The rhythmic ducking dub delays want. |
+| **Ducker** | one envelope, soft knee, one-pole gain: follows the level continuously and cannot flutter at the end of a phrase. |
+
+**Clear in Feedback** additionally scales the feedback with the duck, so the
+old tail really decays instead of only being hidden. Off by default, because it
+changes the echo character; turn it on when a clear should remove the tail.
+
+Switching modes is crossfaded over 25 ms, so it cannot click while audio runs.
 
 The MPC skin shows **100% = kill** on the CLEAR page. Auto Clear is enabled by
 default in the MPC build; **Dub Clean** is the preset that intentionally turns
@@ -75,7 +91,8 @@ it off.
 - Freeze with a click-free crossfade
 - Smooth, click-free parameter changes
 - Output limiter and feedback clamp
-- Auto Clear with audio triggering on MPC and optional MIDI on desktop
+- Auto Clear with two selectable behaviours (Transient / Ducker), audio
+  triggering on MPC and optional MIDI on desktop
 
 ## Presets
 
@@ -212,6 +229,10 @@ input -> low/high cut -> diffusion -> dual delay
 
 ## Versions
 
+- **1.3.3 (MPC)** / **1.3.2 (desktop)** — Auto Clear is now a strategy: the
+  classic Transient ducking is the default, the smooth Ducker is selectable,
+  and Clear in Feedback decides whether the duck also drains the loop. Mode
+  switches are crossfaded over 25 ms.
 - **1.3.2 (MPC)** / **1.3.1 (desktop)** — Auto Clear is now a continuous ducker
   instead of a state machine (no more flutter at the end of a phrase), its gain
   scales the feedback so the tail really decays, the 100% wipe happens once,

@@ -542,6 +542,11 @@ void QDelayAudioProcessorEditor::showSettings()
     diffMenu.addItem(71, "Post Delay", true, diffPath == 1);
     diffMenu.addItem(72, "Legacy Mode", true, audioProcessor.useLegacyDiffusor);
 
+    int clearMode = (int) audioProcessor.params.getRawParameterValue("clear_mode")->load();
+    PopupMenu clearMenu;
+    clearMenu.addItem(90, "Transient", true, clearMode == 0);
+    clearMenu.addItem(91, "Ducker", true, clearMode == 1);
+
     PopupMenu pitchMenu;
     pitchMenu.addItem(85, "Freq Shifter", true, shifterMode == 1);
     pitchMenu.addSeparator();
@@ -560,6 +565,7 @@ void QDelayAudioProcessorEditor::showSettings()
     menu.addSubMenu("Saturation", satMenu);
     menu.addSubMenu("Diffusion", diffMenu);
     menu.addSubMenu("Pitch Shifter", pitchMenu);
+    menu.addSubMenu("Auto Clear", clearMenu);
     menu.addSeparator();
     menu.addItem(9999, "About");
 
@@ -595,6 +601,11 @@ void QDelayAudioProcessorEditor::showSettings()
                 if (result == 53) audioProcessor.setScale(1.75f);
                 if (result == 54) audioProcessor.setScale(2.f);
                 Desktop::getInstance().setGlobalScaleFactor(audioProcessor.scale);
+            }
+            else if (result == 90 || result == 91)
+            {
+                auto param = audioProcessor.params.getParameter("clear_mode");
+                if (param) param->setValueNotifyingHost(result == 91 ? 1.f : 0.f);
             }
             else if (result == 60)
             {

@@ -18,6 +18,7 @@
 #include "dsp/onepole.h"
 #include "dsp/smoother.h"
 #include "dsp/tempo.h"
+#include "dsp/AutoClearStrategies.hpp"
 
 #include <algorithm>
 #include <array>
@@ -37,138 +38,6 @@ namespace
 // ---------------------------------------------------------------------------
 // Auto Clear
 // ---------------------------------------------------------------------------
-class AutoClear
-{
-public:
-    void prepare (double sampleRate)
-    {
-        srate = (float) std::max (8000.0, sampleRate);
-        detAttack  = 1.0f - std::exp (-1.0f / (0.005f * srate));
-        detRelease = 1.0f - std::exp (-1.0f / (0.300f * srate));
-        duckAttack = 1.0f - std::exp (-1.0f / (0.005f * srate));
-        reset();
-    }
-
-    void reset()
-    {
-        env = 0.0f;
-        gain = 1.0f;
-        holdCounter = 0;
-        resetDone = false;
-        tailEnv = 0.0f;
-    }
-
-    // MPC effects never receive MIDI: Auto Clear is always audio-triggered.
-    void set (bool enabled_, float fadeMs_, float thresholdDb_, float holdMs_, float amount_)
-    {
-        enabled = enabled_;
-        fadeMs = clamp (fadeMs_, 2.0f, 1000.0f);
-        holdSamples = std::max (0, (int) (clamp (holdMs_, 0.0f, 2000.0f) * 0.001f * srate));
-        amount = clamp (amount_, 0.0f, 1.0f);
-        threshold = std::pow (10.0f, clamp (thresholdDb_, -80.0f, 0.0f) / 20.0f);
-
-        // The release is the user's Clear Fade. There is no binary gate any
-        // more: the gain follows the detector continuously, so a duck cannot
-        // flutter between open and closed at the end of a phrase.
-        release = 1.0f - std::exp (-1.0f / (fadeMs * 0.001f * srate));
-
-        if (! enabled || amount <= 0.0001f)
-        {
-            env = 0.0f;
-            gain = 1.0f;
-            holdCounter = 0;
-            resetDone = false;
-        }
-    }
-
-    /**
-        Returns the wet gain for this sample.
-
-        clearNow - set once when a 100% clear must wipe the whole delay line.
-    */
-    float process (float left, float right, bool& clearNow)
-    {
-        clearNow = false;
-
-        if (! enabled || amount <= 0.0001f)
-        {
-            env = 0.0f;
-            gain = 1.0f;
-            holdCounter = 0;
-            resetDone = false;
-            return 1.0f;
-        }
-
-        const float peak = std::max (std::abs (left), std::abs (right));
-        env += (peak > env ? detAttack : detRelease) * (peak - env);
-
-        // Soft knee from the threshold up 12 dB; zero slope at both ends.
-        const float low = threshold;
-        const float high = threshold * 4.0f;
-        float x = clamp ((env - low) / (high - low), 0.0f, 1.0f);
-        x = x * x * (3.0f - 2.0f * x);
-
-        // Without a tail there is nothing to clear, and ducking would eat the
-        // first repeat's own attack.
-        const bool hasTail = tailEnv > 0.0005f;
-        const float target = hasTail ? 1.0f - amount * x : 1.0f;
-
-        if (target < gain)
-        {
-            gain += duckAttack * (target - gain);
-            holdCounter = holdSamples;
-        }
-        else if (holdCounter > 0)
-        {
-            --holdCounter;                        // hold the duck, then release
-        }
-        else
-        {
-            gain += release * (target - gain);
-        }
-
-        gain = clamp (gain, 0.0f, 1.0f);
-
-        // At 100% the tank is wiped once, only when the duck is effectively
-        // silent. The re-arm waits for a real quiet gap.
-        if (amount > 0.999f)
-        {
-            if (! resetDone && hasTail && gain < 0.002f && x > 0.80f)
-            {
-                clearNow = true;
-                resetDone = true;
-            }
-            if (env < low * 0.5f && gain > 0.99f)
-                resetDone = false;
-        }
-
-        return gain;
-    }
-
-    // Called by the processor with the delay output so Auto Clear knows
-    // whether there is a tail worth killing.
-    void observeWet (float peak)
-    {
-        tailEnv += (peak > tailEnv ? 0.02f : 0.00015f) * (peak - tailEnv);
-    }
-
-private:
-    float srate = 44100.0f;
-    bool enabled = false;
-    float amount = 1.0f;
-    float fadeMs = 20.0f;
-    float threshold = 0.0056f;
-    float gain = 1.0f;
-    float env = 0.0f;
-    float tailEnv = 0.0f;
-    int holdCounter = 0;
-    int holdSamples = 0;
-    float detAttack = 0.01f, detRelease = 0.001f;
-    float duckAttack = 0.01f;
-    float release = 0.001f;
-    bool resetDone = false;
-};
-
 // ---------------------------------------------------------------------------
 // Diffusion allpass
 // ---------------------------------------------------------------------------
@@ -490,6 +359,7 @@ public:
         pLowCut, pHighCut, pDrive, pTone, pDiffAmt, pDiffSize, pModDepth, pModRate,
         pEqLow, pEqMid, pEqHigh, pDuckAmt, pDuckThres, pDuckAtk, pDuckRel,
         pAutoClear, pClearFade, pClearThresh, pClearHold, pClearAmt, pOsOut,
+        pClearMode, pClearFb,
         kNumParams
     };
 
@@ -499,7 +369,7 @@ public:
         i.name = "QDelay";
         i.vendor = "Tilr";
         i.uniqueId = MPC_FOURCC ('q', 'd', 'e', 'l');
-        i.version = 1302;
+        i.version = 1303;
         i.isInstrument = false;
         i.numInputs = 2;
         i.numOutputs = 2;
@@ -551,6 +421,8 @@ public:
         addParam (logParam ("clear_hold", "Clear Hold", 1.0f, 1000.0f, 1.0f, "ms", 0));
         addParam (floatParam ("clear_amt", "Clear Amt", 0.0f, 100.0f, 100.0f, "%", 0));
         addParam (boolParam ("os_out", "OS 2x", true));
+        addParam (choiceParam ("clear_mode", "Clear Mode", { "Transient", "Ducker" }, 0));
+        addParam (boolParam ("clear_fb", "Clear in Feedback", false));
 
         addPrograms();
     }
@@ -748,11 +620,13 @@ public:
 
         duck.set (get (pDuckThres), get (pDuckAtk), get (pDuckRel));
 
-        autoClear.set (getBool (pAutoClear),
-                       get (pClearFade),
-                       get (pClearThresh),
-                       get (pClearHold),
-                       clamp (get (pClearAmt) * 0.01f, 0.0f, 1.0f));
+        qdelay::ClearParams clearParams;
+        clearParams.enabled = getBool (pAutoClear);
+        clearParams.fadeMs = get (pClearFade);
+        clearParams.thresholdDb = get (pClearThresh);
+        clearParams.holdMs = get (pClearHold);
+        clearParams.amount = clamp (get (pClearAmt) * 0.01f, 0.0f, 1.0f);
+        autoClear.set (clearParams, getInt (pClearMode) == 1, getBool (pClearFb));
 
         // ---- per-sample loop --------------------------------------------
         for (int i = 0; i < n; ++i)
@@ -763,7 +637,9 @@ public:
             // Auto Clear must be evaluated before the delay write so its gain
             // can drain the feedback loop and a full kill can wipe the line.
             bool clearNow = false;
-            const float autoClearGain = autoClear.process (dryL, dryR, clearNow);
+            const float dryPeak = std::max (std::abs (dryL), std::abs (dryR));
+            const float autoClearGain = autoClear.process (dryPeak, clearNow);
+            const float clearFbScale = autoClear.feedbackScale();
             if (clearNow)
             {
                 // Full kill: wipe the line and every stateful block around it,
@@ -825,8 +701,8 @@ public:
             // Scale the feedback too, not just the output: a duck must remove
             // energy from the loop, otherwise the old tail reappears when the
             // gain opens again and that sounds like stuttering.
-            fbL *= autoClearGain;
-            fbR *= autoClearGain;
+            fbL *= clearFbScale;
+            fbR *= clearFbScale;
 
             const float fz = freezeSmooth.process();
             float fb = feedback.process();
@@ -866,6 +742,12 @@ public:
                 const float mono = 0.5f * (sendL + sendR);
                 writeL = mono + fbR * fb;
                 writeR = fbL * fb;
+            }
+
+            if (autoClear.muteWrites())
+            {
+                writeL = 0.0f;
+                writeR = 0.0f;
             }
 
             if (std::fabs (writeL) > 1.0f) writeL = softClip (writeL);
@@ -1067,7 +949,7 @@ private:
     Biquad eqLowL, eqLowR, eqMidL, eqMidR, eqHighL, eqHighR;
     DCBlocker dcL, dcR;
 
-    AutoClear autoClear;
+    qdelay::AutoClearEngine autoClear;
     DuckFollower duck;
     Limiter2x limL, limR;
     bool osOutActive = true;

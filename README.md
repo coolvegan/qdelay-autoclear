@@ -118,6 +118,13 @@ The factory bank contains **Init**, **Classic Pong** and nine Dub presets:
 | Auto Clear Throw | 1/4 send with a 12 ms Auto Clear and 40 ms hold |
 | Dub Clean | open, clean 1/4 dub echo without drive |
 
+### Presets and the MPC screen
+
+Loading a preset or a project now updates the MPC screen right away. The plugin
+reports the changed parameters to the host and requests a redraw, so the knobs
+follow the preset instead of showing the previous positions. This is the
+behaviour in the 2026-11 builds.
+
 ## Akai MPC
 
 MPC OS 3.10.1+ loads third-party VST2 plugins from a `VST2 Plugins` folder at

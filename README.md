@@ -165,6 +165,13 @@ The MPC build is a VST2 shared library with only `libc` and `libm` as
 dependencies. It exports `VSTPluginMain` and uses the clean-room VST2 ABI from
 the MPC SDK.
 
+### MPC Sample (Knob FX)
+
+On an MPC Sample (firmware 1.4.0+, Custom Plug-In Support) QDelay runs as a
+Knob FX: knobs = Div L, Feedback, Mix; SHIFT = Sync, Low Cut, High Cut.
+Time L/R is not exposed there; leave Sync on and use the division, or turn
+Sync off on SHIFT when you need free time.
+
 ## ARM64 Linux desktop
 
 The JUCE editor build (the one shown in `sketch.png`) can be cross-compiled for

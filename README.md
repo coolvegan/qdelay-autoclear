@@ -251,6 +251,14 @@ input -> low/high cut -> diffusion -> dual delay
 
 ## Versions
 
+- **1.3.9 (MPC)** — Auto Clear is a ducker again. The 100 % kill reset the
+  delay line and muted the writes instantly; the zero step in the buffer was
+  read back at the next repeat as a broadband click on every 1/8 note. The
+  trigger now only fires when the new note is within 6 dB of the tail (a quiet
+  noise floor no longer clears a loud tail), and 100 % is a full duck, not a
+  wipe. Default Clear Amt is 70 %; use *Clear in Feedback* to drain the loop.
+  Measured with 1/8 notes: strongest HF burst at the trigger −24.2 dBFS
+  (1.3.8) → −78.5 dBFS (1.3.9); wet envelope spread 147 dB → 18 dB.
 - **1.3.8 (MPC)** — the Auto Clear full kill faded out in a fixed 2 ms, which
   cut a ringing tail almost instantly. With Clear Amt 100 % and a low Clear
   Threshold that was audible as a click at the end of a phrase. The kill now

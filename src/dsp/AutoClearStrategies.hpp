@@ -109,7 +109,10 @@ public:
         const bool hasTail = tailEnv > 0.0005f;
         const bool aboveFloor = peak > threshold;
         const bool rising = (fastEnv > slowEnv * 1.30f) || (peak > slowEnv * 1.45f);
-        if (hasTail && aboveFloor && rising && sinceTrigger > refractory && state != State::fadingOut)
+        // A tiny noise floor above a very low Clear Thr must not wipe a loud
+        // tail. Only a new note that is within 6 dB of the tail may clear it.
+        const bool significant = peak > tailEnv * 0.5f;
+        if (hasTail && aboveFloor && rising && significant && sinceTrigger > refractory && state != State::fadingOut)
             trigger();
 
         if (sinceTrigger < 0x3fffffff)
@@ -180,17 +183,18 @@ private:
     void trigger()
     {
         sinceTrigger = 0;
-        kill = amount > 0.999f;
-        fadeFloor = kill ? 0.0f : 1.0f - amount;
-        // Kill uses the user's Clear Fade as well. The old fixed 2 ms fade
-        // cut a ringing tail almost instantly and was audible as a click at
-        // the end of the phrase (Auto Clear with Clear Amt 100 %).
+        // Never wipe the line or mute the writes: the instantaneous zero in
+        // the delay buffer was read back as a broadband click at the next
+        // repeat (heard on every 1/8 note). Auto Clear is a ducker; use
+        // "Clear in Feedback" if the loop itself should be drained.
+        kill = false;
+        fadeFloor = 1.0f - amount;
         const float outMs = fadeMs;
         fadeOutSamples = std::max (1, (int) (outMs * 0.001f * srate));
         fadeStep = std::max (1.0e-6f, (gain - fadeFloor) / (float) fadeOutSamples);
         if (gain <= fadeFloor)
             gain = fadeFloor;
-        muteWrites_ = kill;
+        muteWrites_ = false;
         state = State::fadingOut;
     }
 
@@ -289,7 +293,8 @@ public:
         x = x * x * (3.0f - 2.0f * x);
 
         const bool hasTail = tailEnv > 0.0005f;
-        const float target = hasTail ? 1.0f - amount * x : 1.0f;
+        const bool significant = peak > tailEnv * 0.5f;
+        const float target = (hasTail && significant) ? 1.0f - amount * x : 1.0f;
 
         if (target < gain)
         {

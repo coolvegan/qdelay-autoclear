@@ -401,7 +401,7 @@ public:
         i.name = "QDelay";
         i.vendor = "Tilr";
         i.uniqueId = MPC_FOURCC ('q', 'd', 'e', 'l');
-        i.version = 1308;
+        i.version = 1309;
         i.isInstrument = false;
         i.numInputs = 2;
         i.numOutputs = 2;
@@ -456,7 +456,7 @@ public:
         addParam (logParam ("clear_fade", "Clear Fade", 2.0f, 500.0f, 20.0f, "ms", 0));
         addParam (floatParam ("clear_thr", "Clear Thr", -60.0f, 0.0f, -45.0f, "dB", 1));
         addParam (logParam ("clear_hold", "Clear Hold", 1.0f, 1000.0f, 1.0f, "ms", 0));
-        addParam (floatParam ("clear_amt", "Clear Amt", 0.0f, 100.0f, 100.0f, "%", 0));
+        addParam (floatParam ("clear_amt", "Clear Amt", 0.0f, 100.0f, 70.0f, "%", 0));
         addParam (boolParam ("os_out", "OS 2x", true));
         addParam (choiceParam ("clear_mode", "Clear Mode", { "Transient", "Ducker" }, 0));
         addParam (boolParam ("clear_fb", "Clear in Feedback", false));

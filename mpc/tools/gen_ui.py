@@ -620,8 +620,9 @@ def toggle_component(style, overlay_name):
 def radio_component(style, overlay_name, n):
     """An n-way choice switch: name on top, n segment buttons below (their captions are added by the tab)."""
     width, xs = SEGMENTS[n]
-    children = [focus_child(style),
-                entry("name", "Label", label_data("Name", style["muted"], 24.0), "15 8 248 34", "No", "Show", "Always")]
+    # The host does not fill a "Name" label for radio components, so the tab
+    # adds an explicit heading per control instead (see below).
+    children = [focus_child(style)]
     for i, x in enumerate(xs):
         children.append(entry("seg %d" % i, "Button", button_data("seg%d_on.png" % n, "seg%d_off.png" % n, i, n),
                               "%d 54 %d 40" % (x, width), "No", "Show", "Always"))
@@ -683,7 +684,12 @@ def tab_component(page, style):
         children.append(entry(ctl.param.name, ctl.definition, obj(("version", 1), ("handleName", "Data")), bounds,
                               "Yes", "Hide", "Always", remap=[("Data", ctl.param.handle)], invalidating=invalidating))
         if ctl.definition.startswith("radio"):
-            # Segment captions live in the tab (the definition is shared by every n-way switch).
+            # Group caption and segment captions live in the tab (the definition
+            # is shared by every n-way switch).
+            children.append(entry("%s heading" % ctl.param.name, "Label",
+                                  label_data("Text", style["muted"], 24.0, "left", ctl.param.name),
+                                  "%d %d 248 32" % (SLOT_X[col] + 15, SLOT_Y[row] + 10),
+                                  "No", "Hide", "Always", invalidating=invalidating))
             width, xs = SEGMENTS[len(ctl.param.choices)]
             for ci, (choice, x) in enumerate(zip(ctl.param.choices, xs)):
                 children.append(entry("%s seg %d" % (ctl.param.name, ci), "Label",

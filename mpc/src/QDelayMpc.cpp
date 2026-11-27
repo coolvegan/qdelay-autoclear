@@ -401,12 +401,17 @@ public:
         i.name = "QDelay";
         i.vendor = "Tilr";
         i.uniqueId = MPC_FOURCC ('q', 'd', 'e', 'l');
-        i.version = 1306;
+        i.version = 1307;
         i.isInstrument = false;
         i.numInputs = 2;
         i.numOutputs = 2;
         i.wantsMidi = false;                    // MPC effects never receive MIDI
         i.latencySamples = kOsLatency;          // output limiter runs at 2x
+        // The MPC asks for the tail length (effGetTailSize). 0 means unknown;
+        // a host that stops processing when the input ends would cut the
+        // delay tail, which is heard as a click at the end. 20 s covers the
+        // longest factory tail (feedback 68 %, 4 s delay).
+        i.tailSamples = 20 * 44100;
         return i;
     }
 

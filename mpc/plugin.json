@@ -1,7 +1,7 @@
 {
   "name": "QDelay",
   "manufacturer": "Tilr",
-  "version": "1.3.6",
+  "version": "1.3.7",
   "format": "vst2",
   "kind": "effect",
   "uid": "qdel",

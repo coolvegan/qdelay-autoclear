@@ -251,6 +251,9 @@ input -> low/high cut -> diffusion -> dual delay
 
 ## Versions
 
+- **1.3.7 (MPC)** — report the delay tail length (`effGetTailSize`) as 20 s.
+  It was 0 (unknown); a host that stops processing when the input ends cuts
+  the tail, which is heard as a click at the end.
 - **1.3.6 (MPC)** — the feedback saturator was never initialised: `Sat2x::prepare()`
   built the halfband coefficients, but the plugin never called it, so `Drive`
   above 0 % silenced the feedback path. All dub presets use Drive 12–28 %, so

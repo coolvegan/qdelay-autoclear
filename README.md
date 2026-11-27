@@ -251,6 +251,12 @@ input -> low/high cut -> diffusion -> dual delay
 
 ## Versions
 
+- **1.3.8 (MPC)** — the Auto Clear full kill faded out in a fixed 2 ms, which
+  cut a ringing tail almost instantly. With Clear Amt 100 % and a low Clear
+  Threshold that was audible as a click at the end of a phrase. The kill now
+  uses the user's Clear Fade as well (20–70 ms in the presets). Measured with
+  Dub Chamber: the 5 ms RMS after the trigger went from −123 dBFS (2 ms fade)
+  to −46 dBFS (20 ms fade), i.e. a ~30 ms fade instead of a 2 ms cut.
 - **1.3.7 (MPC)** — report the delay tail length (`effGetTailSize`) as 20 s.
   It was 0 (unknown); a host that stops processing when the input ends cuts
   the tail, which is heard as a click at the end.

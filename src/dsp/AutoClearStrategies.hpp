@@ -182,7 +182,10 @@ private:
         sinceTrigger = 0;
         kill = amount > 0.999f;
         fadeFloor = kill ? 0.0f : 1.0f - amount;
-        const float outMs = kill ? 2.0f : fadeMs;
+        // Kill uses the user's Clear Fade as well. The old fixed 2 ms fade
+        // cut a ringing tail almost instantly and was audible as a click at
+        // the end of the phrase (Auto Clear with Clear Amt 100 %).
+        const float outMs = fadeMs;
         fadeOutSamples = std::max (1, (int) (outMs * 0.001f * srate));
         fadeStep = std::max (1.0e-6f, (gain - fadeFloor) / (float) fadeOutSamples);
         if (gain <= fadeFloor)

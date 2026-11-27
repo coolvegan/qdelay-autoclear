@@ -401,7 +401,7 @@ public:
         i.name = "QDelay";
         i.vendor = "Tilr";
         i.uniqueId = MPC_FOURCC ('q', 'd', 'e', 'l');
-        i.version = 1307;
+        i.version = 1308;
         i.isInstrument = false;
         i.numInputs = 2;
         i.numOutputs = 2;

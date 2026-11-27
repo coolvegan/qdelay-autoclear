@@ -9,7 +9,7 @@ cd "$ROOT"
 
 MPC="$ROOT/mpc"
 BUILD="$MPC/build"
-PKG="$ROOT/dist/mpc/Tilr - VST - QDelay"
+PKG="$ROOT/dist/mpc/r3d0xStyle - VST - QDelay"
 IMAGE="qdelay-mpc-cross"
 CXX="${CXX:-g++}"
 
@@ -70,7 +70,7 @@ QDelay for Akai MPC - installation
 
 1. Copy the whole folder
 
-       Tilr - VST - QDelay
+       r3d0xStyle - VST - QDelay
 
    into a folder named exactly
 
@@ -80,9 +80,9 @@ QDelay for Akai MPC - installation
 
    The result must look like:
 
-       <drive>/VST2 Plugins/Tilr - VST - QDelay/plugin.json
-       <drive>/VST2 Plugins/Tilr - VST - QDelay/VST/qdelay-arm64.so
-       <drive>/VST2 Plugins/Tilr - VST - QDelay/Plugin Skins/TUI.json
+       <drive>/VST2 Plugins/r3d0xStyle - VST - QDelay/plugin.json
+       <drive>/VST2 Plugins/r3d0xStyle - VST - QDelay/VST/qdelay-arm64.so
+       <drive>/VST2 Plugins/r3d0xStyle - VST - QDelay/Plugin Skins/TUI.json
 
 2. On the MPC enable:
        Preferences -> Enhancements (Beta) -> Enable Enhancements
@@ -100,7 +100,7 @@ QDelay is an insert effect. Its UI is the MPC touchscreen skin in
 EOF
 
 cat > "$PKG/README.txt" <<'EOF'
-QDelay 1.3.9 - dual dub delay for Akai MPC
+QDelay 1.4.0 - dual dub delay for Akai MPC
 ==========================================
 
 A stereo dual delay built for dub: independent tempo-synced taps, normal /
@@ -157,7 +157,7 @@ python3 - "$PKG" <<'PY'
 import os, shutil, sys
 pkg = sys.argv[1]
 root = os.path.dirname(os.path.dirname(pkg))
-archive = os.path.join(root, "Tilr - VST - QDelay-1.3.9")
+archive = os.path.join(root, "r3d0xStyle - VST - QDelay-1.4.0")
 shutil.make_archive(archive, "zip", os.path.dirname(pkg), os.path.basename(pkg))
 print("wrote " + archive + ".zip")
 PY

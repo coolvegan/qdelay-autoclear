@@ -58,7 +58,7 @@ This build is for ARM64 Linux desktops. It is NOT the Akai MPC build: MPC has
 no plugin windows and no X11/font stack, so the MPC version is a separate,
 headless VST2 with a touchscreen JSON skin. Use the folder
 
-    dist/mpc/Tilr - VST - QDelay
+    dist/mpc/r3d0xStyle - VST - QDelay
 
 on MPC hardware (MPC OS 3.10.1+, External Plugin Support enabled).
 

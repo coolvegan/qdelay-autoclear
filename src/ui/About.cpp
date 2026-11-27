@@ -34,7 +34,9 @@ void About::paint(Graphics& g)
 	g.setFont(FontOptions(20.f));
 	g.drawText(std::string("v") + PROJECT_VERSION, bounds.removeFromTop(25), Justification::centred);
 	g.setFont(FontOptions(20.0f));
-	g.drawText("Copyright (C) Tilr 2026", bounds.removeFromTop(25), Justification::centred);
+	g.drawText("r3d0xStyle 2026", bounds.removeFromTop(25), Justification::centred);
+	g.setFont(FontOptions(16.0f));
+	g.drawText("Based on QDelay by Tilr (GPL-3.0)", bounds.removeFromTop(22), Justification::centred);
 	g.setColour(Colour(COLOR_ACTIVE));
 	bounds.removeFromTop(25); // site link
 	g.setColour(Colours::white);

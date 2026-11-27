@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SRC="$ROOT/dist/mpc/Tilr - VST - QDelay"
+SRC="$ROOT/dist/mpc/r3d0xStyle - VST - QDelay"
 [ -d "$SRC" ] || { echo "missing $SRC - run ./scripts/build-mpc.sh first" >&2; exit 1; }
 
 DEV="$(blkid -L 'MPC User' 2>/dev/null || true)"
@@ -20,12 +20,12 @@ fi
 
 DEST="$MNT/VST2 Plugins"
 mkdir -p "$DEST"
-rm -rf "$DEST/Tilr - VST - QDelay"
+rm -rf "$DEST/Tilr - VST - QDelay" "$DEST/r3d0xStyle - VST - QDelay"
 cp -a "$SRC" "$DEST/"
 sync
 
-echo "installed: $DEST/Tilr - VST - QDelay"
-find "$DEST/Tilr - VST - QDelay" -maxdepth 2 -type f -printf '  %P\n' | sort
+echo "installed: $DEST/r3d0xStyle - VST - QDelay"
+find "$DEST/r3d0xStyle - VST - QDelay" -maxdepth 2 -type f -printf '  %P\n' | sort
 
 if [ "$MOUNTED_BY_US" = "1" ]; then
     udisksctl unmount -b "$DEV" >/dev/null

@@ -25,7 +25,7 @@ Build and package from the repository root:
 The script builds a native copy for the x86_64 host simulator, runs the MPC
 load/processing/state tests, generates the skin, cross-compiles
 `qdelay-arm64.so` and `qdelay-arm32.so` in Docker, validates the package and
-writes `dist/Tilr - VST - QDelay-1.3.6.zip`.
+writes `dist/r3d0xStyle - VST - QDelay-1.4.0.zip`.
 
 The MPC framework is MIT licensed; see `vendor/MPC-PLUGIN-SDK-LICENSE`.
 The VST2 ABI in `framework/mpc_vst2_abi.h` is a clean-room description and does

@@ -9,7 +9,7 @@ option(BUILD_VST2 "Build VST2 plugin format" ON)
 option(BUILD_VST3 "Build VST3 plugin format" ON)
 option(BUILD_LV2 "Build LV2 plugin format" ON)
 
-project(QDelay VERSION 1.3.2)
+project(QDelay VERSION 1.4.0)
 
 add_compile_definitions(PROJECT_VERSION="${PROJECT_VERSION}")
 set(CMAKE_CXX_STANDARD 20)
@@ -48,7 +48,7 @@ if (BUILD_LV2 AND UNIX AND NOT APPLE)
 endif()
 
 juce_add_plugin(${PROJECT_NAME}
-        COMPANY_NAME Tilr
+        COMPANY_NAME r3d0xStyle
         IS_SYNTH FALSE
         NEEDS_MIDI_INPUT True
         NEEDS_MIDI_OUTPUT false
@@ -56,11 +56,11 @@ juce_add_plugin(${PROJECT_NAME}
         EDITOR_WANTS_KEYBOARD_FOCUS FALSE
         JUCE_VST3_CAN_REPLACE_VST2 FALSE
         COPY_PLUGIN_AFTER_BUILD TRUE
-        PLUGIN_MANUFACTURER_CODE Tilr
+        PLUGIN_MANUFACTURER_CODE R3D0
         PLUGIN_CODE qdel
         FORMATS ${plugin_formats}
         PRODUCT_NAME "QDelay"
-        BUNDLE_ID "com.tilr.qdelay"
+        BUNDLE_ID "com.r3d0xstyle.qdelay"
         LV2URI "https://github.com/tiagolr/qdelay"
 )
 

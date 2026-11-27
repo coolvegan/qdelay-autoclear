@@ -399,9 +399,9 @@ public:
     {
         mpc::PluginInfo i;
         i.name = "QDelay";
-        i.vendor = "Tilr";
+        i.vendor = "r3d0xStyle";
         i.uniqueId = MPC_FOURCC ('q', 'd', 'e', 'l');
-        i.version = 1309;
+        i.version = 1400;
         i.isInstrument = false;
         i.numInputs = 2;
         i.numOutputs = 2;

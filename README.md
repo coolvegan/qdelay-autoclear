@@ -141,7 +141,7 @@ Build and package:
 Output:
 
 ```
-dist/mpc/Tilr - VST - QDelay/
+dist/mpc/r3d0xStyle - VST - QDelay/
 ├── plugin.json
 ├── version.xml
 ├── VST/qdelay-arm64.so     # MPC Live III / XL and 64-bit MPC OS
@@ -151,7 +151,7 @@ dist/mpc/Tilr - VST - QDelay/
 
 Install:
 
-1. Copy the whole `Tilr - VST - QDelay` folder to
+1. Copy the whole `r3d0xStyle - VST - QDelay` folder to
    `<drive>/VST2 Plugins/`.
 2. On the MPC open **Preferences → Enhancements (Beta)** and enable
    **Enable Enhancements** and **External Plugin Support**.
@@ -251,6 +251,10 @@ input -> low/high cut -> diffusion -> dual delay
 
 ## Versions
 
+- **1.4.0 (MPC)** — rebrand: the MPC manufacturer/vendor and package folder are
+  now **r3d0xStyle** (`r3d0xStyle - VST - QDelay`); the installer removes the old
+  `Tilr - VST - QDelay` folder. The upstream attribution to **Tilr** stays in the
+  credits, the About line and the source headers, as required by the GPL.
 - **1.3.9 (MPC)** — Auto Clear is a ducker again. The 100 % kill reset the
   delay line and muted the writes instantly; the zero step in the buffer was
   read back at the next repeat as a broadband click on every 1/8 note. The

@@ -1,5 +1,5 @@
 {
-  "name": "QDelay", "vendor": "Tilr", "uid": "qdel", "uidInt": 1902404972, "version": 1305,
+  "name": "QDelay", "vendor": "Tilr", "uid": "qdel", "uidInt": 1902404972, "version": 1306,
   "isInstrument": false, "numInputs": 2, "numOutputs": 2, "numPrograms": 11,
   "programs": ["Init", "Dub Chamber", "Tubby's Tape", "Thunder Dub", "Dub Siren", "Melodica Echo", "Spring Dub", "Dub Plate", "Auto Clear Throw", "Classic Pong", "Dub Clean"],
   "params": [

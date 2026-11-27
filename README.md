@@ -251,6 +251,17 @@ input -> low/high cut -> diffusion -> dual delay
 
 ## Versions
 
+- **1.3.6 (MPC)** — the feedback saturator was never initialised: `Sat2x::prepare()`
+  built the halfband coefficients, but the plugin never called it, so `Drive`
+  above 0 % silenced the feedback path. All dub presets use Drive 12–28 %, so
+  they had exactly one echo and no tail. Fixed, and the saturator was rebuilt
+  with unity small-signal gain (the old `tanh(v·g)/tanh(g)` boosted the loop by
+  up to +14 dB) and a knee instead of a hard ceiling. The feedback write guard
+  no longer has a 1.4 dB step at 1.0 and now allows 4.0 of internal headroom;
+  at 80 % feedback the tail distortion fell from −19.9 to −44.2 dB. The output
+  limiter knee was widened from 0.35 to 2 dB. Measured: with *Dub Chamber* the
+  tail used to be silent after 0.8 s (−240 dBFS); it now decays to −62 dBFS at
+  3–4 s.
 - **1.3.3 (MPC)** / **1.3.2 (desktop)** — Auto Clear is now a strategy: the
   classic Transient ducking is the default, the smooth Ducker is selectable,
   and Clear in Feedback decides whether the duck also drains the loop. Mode

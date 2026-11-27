@@ -100,7 +100,7 @@ QDelay is an insert effect. Its UI is the MPC touchscreen skin in
 EOF
 
 cat > "$PKG/README.txt" <<'EOF'
-QDelay 1.3.5 - dual dub delay for Akai MPC
+QDelay 1.3.6 - dual dub delay for Akai MPC
 ==========================================
 
 A stereo dual delay built for dub: independent tempo-synced taps, normal /
@@ -157,7 +157,7 @@ python3 - "$PKG" <<'PY'
 import os, shutil, sys
 pkg = sys.argv[1]
 root = os.path.dirname(os.path.dirname(pkg))
-archive = os.path.join(root, "Tilr - VST - QDelay-1.3.5")
+archive = os.path.join(root, "Tilr - VST - QDelay-1.3.6")
 shutil.make_archive(archive, "zip", os.path.dirname(pkg), os.path.basename(pkg))
 print("wrote " + archive + ".zip")
 PY

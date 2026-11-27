@@ -176,7 +176,31 @@ inline float softClipKnee (float x, float knee)
     return x < 0.0f ? -y : y;
 }
 
-inline float softLimit (float x) { return softClipKnee (x, kLimitKnee); }
+inline float softLimit (float x)
+{
+    // 2 dB knee: the old 0.35 dB knee was a hard clipper and produced the
+    // coarse edge on hot tails.
+    const float start = kLimitKnee * dbToGain (-2.0f);
+    const float width = kLimitKnee - start;
+    const float a = std::fabs (x);
+    if (a <= start)
+        return x;
+    const float y = start + width * fastTanh ((a - start) / width);
+    return x < 0.0f ? -y : y;
+}
+
+// Feedback write guard: transparent below 4.0, C1-continuous at the knee,
+// bounded at 5.0. dsp/math.h softClip() is 0.852 at 1.0, so calling it only
+// above 1.0 added a 1.4 dB step at the threshold; the old 1.0 ceiling also
+// hard-clipped every hot feedback repeat (10 % THD at 80 % feedback).
+inline float softClipAboveOne (float x)
+{
+    const float a = std::fabs (x);
+    if (a <= 4.0f)
+        return x;
+    const float y = 4.0f + 1.0f * fastTanh ((a - 4.0f) / 1.0f);
+    return x < 0.0f ? -y : y;
+}
 
 // ---------------------------------------------------------------------------
 // 2x oversampled feedback saturation
@@ -239,12 +263,20 @@ public:
         y0 *= 2.0f;
         y1 *= 2.0f;
 
-        const float g = 1.0f + drive * 4.0f;
-        const float norm = fastTanh (g);
-        const float mix = 0.7f * drive;
+        // Unity gain below the knee, bounded at 1.0 above it. Drive lowers the
+        // knee, so it controls how much of the feedback is saturated without
+        // ever boosting small signals. The old tanh(v*g)/tanh(g) normalisation
+        // had a small-signal gain of g/tanh(g) (up to +14 dB), which made the
+        // 0.995 feedback loop unstable.
+        const float kneeStart = 0.8f - 0.6f * drive;
+        const float kneeWidth = 1.0f - kneeStart;
         const auto sat = [&] (float v)
         {
-            return v * (1.0f - mix) + (fastTanh (v * g) / norm) * mix;
+            const float a = std::fabs (v);
+            if (a <= kneeStart)
+                return v;
+            const float y = kneeStart + kneeWidth * fastTanh ((a - kneeStart) / kneeWidth);
+            return v < 0.0f ? -y : y;
         };
 
         down[(size_t) write] = sat (y0);
@@ -369,7 +401,7 @@ public:
         i.name = "QDelay";
         i.vendor = "Tilr";
         i.uniqueId = MPC_FOURCC ('q', 'd', 'e', 'l');
-        i.version = 1305;
+        i.version = 1306;
         i.isInstrument = false;
         i.numInputs = 2;
         i.numOutputs = 2;
@@ -467,6 +499,8 @@ public:
         sendHighR.setCoeffs (BiquadCoeffs::lowpass (sampleRate, 12000.0f, 0.707f));
         satToneL.setCutoff (8000.0f, sampleRate);
         satToneR.setCutoff (8000.0f, sampleRate);
+        satL.prepare (sampleRate);
+        satR.prepare (sampleRate);
 
         dcL.prepare (sampleRate, 8.0f);
         dcR.prepare (sampleRate, 8.0f);
@@ -750,8 +784,8 @@ public:
                 writeR = 0.0f;
             }
 
-            if (std::fabs (writeL) > 1.0f) writeL = softClip (writeL);
-            if (std::fabs (writeR) > 1.0f) writeR = softClip (writeR);
+            writeL = softClipAboveOne (writeL);
+            writeR = softClipAboveOne (writeR);
 
             delayL.write (writeL);
             delayR.write (writeR);
